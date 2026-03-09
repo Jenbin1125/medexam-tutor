@@ -457,7 +457,40 @@
             const [showAdmin, setShowAdmin] = React.useState(false);
             const [adminEmails, setAdminEmails] = React.useState([]);
             const [newEmail, setNewEmail] = React.useState('');
+            const [showFeedback, setShowFeedback] = React.useState(false);
+            const [feedbackError, setFeedbackError] = React.useState('');
+            const [feedbackSuccess, setFeedbackSuccess] = React.useState('');
+            const [feedbackSending, setFeedbackSending] = React.useState(false);
+            const feedbackRef = React.useRef({ errorReport: '', suggestion: '' });
             const userId = session?.user?.id;
+
+            // ── 24 小時自動登出機制 ──
+            React.useEffect(() => {
+                if (!session) return;
+                const SESSION_DURATION = 23 * 3600 * 1000 + 59 * 60 * 1000 + 59 * 1000; // 23:59:59
+                const loginKey = 'medtutor_login_time';
+                let loginTime = null;
+                try { loginTime = parseInt(localStorage.getItem(loginKey)); } catch {}
+                if (!loginTime || isNaN(loginTime)) {
+                    loginTime = Date.now();
+                    try { localStorage.setItem(loginKey, String(loginTime)); } catch {}
+                }
+                const elapsed = Date.now() - loginTime;
+                const remaining = SESSION_DURATION - elapsed;
+                if (remaining <= 0) {
+                    // 已過期，立即登出
+                    try { localStorage.removeItem(loginKey); } catch {}
+                    onLogout();
+                    return;
+                }
+                // 設定倒計時登出
+                const timer = setTimeout(() => {
+                    try { localStorage.removeItem(loginKey); } catch {}
+                    alert('登入時間已滿 24 小時，系統將自動登出。');
+                    onLogout();
+                }, remaining);
+                return () => clearTimeout(timer);
+            }, [session]);
 
             // ── 初始化：載入進度 + 收藏 + 管理員狀態 ──
             React.useEffect(() => {
@@ -525,6 +558,30 @@
             };
             const removeEmail = async (id) => { await supabase.from('allowed_emails').delete().eq('id', id); loadAdminEmails(); };
             React.useEffect(() => { if (showAdmin) loadAdminEmails(); }, [showAdmin]);
+
+            // ── 意見回饋（存入 Supabase，同時嘗試 Edge Function 寄信）──
+            const sendFeedback = async () => {
+                const { errorReport, suggestion } = feedbackRef.current;
+                if (!errorReport.trim() && !suggestion.trim()) { setFeedbackError('請至少填寫一個欄位'); return; }
+                setFeedbackSending(true);
+                setFeedbackError('');
+                setFeedbackSuccess('');
+                try {
+                    const senderEmail = session?.user?.email || 'unknown';
+                    // 存入 Supabase feedback 表（確保回饋不丟失）
+                    const { error: dbErr } = await supabase.from('user_feedback').insert({
+                        user_id: userId,
+                        sender_email: senderEmail,
+                        error_report: errorReport.trim(),
+                        suggestion: suggestion.trim(),
+                    });
+                    if (dbErr) throw dbErr;
+                    setFeedbackSuccess('回饋已送出，感謝您的意見！');
+                    setTimeout(() => { setShowFeedback(false); setFeedbackSuccess(''); feedbackRef.current = { errorReport: '', suggestion: '' }; }, 2000);
+                } catch (e) {
+                    setFeedbackError('送出失敗：' + (e.message || '未知錯誤'));
+                } finally { setFeedbackSending(false); }
+            };
 
             // ── 進度計算 ──
             const getProgress = React.useCallback((nodeId) => {
@@ -669,20 +726,31 @@
 
             return (
                 <div className="min-h-screen flex flex-col">
-                    {/* 精簡 Header：標題 + Tab 合併為一行 */}
-                    <header className="bg-slate-900 text-white shadow-md sticky top-0 z-30">
-                        <div className="max-w-4xl mx-auto px-4 py-2 flex items-center gap-2">
-                            <div className="bg-gradient-to-br from-teal-400 to-teal-600 p-1.5 rounded-lg shadow"><Icons.Network /></div>
-                            <h1 className="text-base font-bold tracking-wide mr-4 hidden md:block">AI 臨床導師</h1>
-                            <div className="flex gap-1 flex-1 overflow-x-auto">
-                                {[{id:'graph',label:'1. 知識圖譜'},{id:'ai-explain',label:'2. 詳解測驗'},{id:'review',label:`3. 考前複習 (${starredUids.size})`}].map(tab => (
-                                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-3 py-2 rounded-lg font-bold text-xs transition-all whitespace-nowrap ${activeTab===tab.id?'bg-teal-600 text-white':'text-slate-400 hover:text-white hover:bg-slate-700'}`}>{tab.label}</button>
-                                ))}
+                    <header className="bg-slate-900 text-white sticky top-0 z-30 border-b border-slate-700/50">
+                        <div className="max-w-5xl mx-auto px-4 h-12 flex items-center">
+                            {/* Logo + 標題 */}
+                            <div className="flex items-center gap-2.5 mr-5 flex-shrink-0">
+                                <div className="bg-gradient-to-br from-teal-400 to-emerald-500 p-1.5 rounded-lg"><Icons.Network /></div>
+                                <span className="font-bold text-sm tracking-wide hidden sm:block text-slate-200">AI 臨床導師</span>
                             </div>
-                            <span className="text-[10px] text-slate-500 hidden lg:block">{session?.user?.email}</span>
-                            {isAdmin && <button onClick={() => setShowAdmin(!showAdmin)} className="text-[10px] text-slate-400 hover:text-amber-400 flex items-center gap-1 px-1.5 py-1 rounded hover:bg-slate-700"><Icons.Shield /></button>}
-                            <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
-                            <button onClick={onLogout} className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 px-1.5 py-1 rounded hover:bg-slate-700"><Icons.LogOut /></button>
+                            {/* Tab 導航 */}
+                            <nav className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto">
+                                {[{id:'graph',label:'1. 知識圖譜',icon:'📊'},{id:'ai-explain',label:'2. 測驗詳解',icon:'🧠'},{id:'review',label:`3. 考前複習`,icon:'⭐'}].map(tab => (
+                                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`relative px-3 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${activeTab===tab.id ? 'bg-teal-500/20 text-teal-300' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>
+                                        {tab.label}{tab.id==='review' && starredUids.size > 0 && <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px]">{starredUids.size}</span>}
+                                        {activeTab===tab.id && <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-teal-400 rounded-full"/>}
+                                    </button>
+                                ))}
+                            </nav>
+                            {/* 右側工具列 */}
+                            <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                                <span className="text-[10px] text-slate-500 hidden xl:block mr-1 max-w-[140px] truncate">{session?.user?.email}</span>
+                                {isAdmin && <button onClick={() => setShowAdmin(!showAdmin)} className="p-1.5 rounded-md text-slate-500 hover:text-amber-400 hover:bg-slate-800 transition-colors" title="管理員"><Icons.Shield /></button>}
+                                <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+                                <button onClick={() => { setShowFeedback(true); setFeedbackError(''); setFeedbackSuccess(''); }} className="p-1.5 rounded-md text-slate-500 hover:text-sky-400 hover:bg-slate-800 transition-colors" title="意見回饋"><Icons.Mail /></button>
+                                <div className="w-px h-5 bg-slate-700 mx-0.5"></div>
+                                <button onClick={onLogout} className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors" title="登出"><Icons.LogOut /></button>
+                            </div>
                         </div>
                     </header>
 
@@ -702,6 +770,50 @@
                                             <button onClick={() => removeEmail(ae.id)} className="text-red-400 hover:text-red-600 p-1"><Icons.Trash /></button>
                                         </div>
                                     ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 意見回饋彈窗 */}
+                    {showFeedback && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowFeedback(false)} style={{background:'rgba(15,23,42,0.7)',backdropFilter:'blur(6px)'}}>
+                            <div className="bg-white rounded-2xl w-full max-w-md animate-fade-in overflow-hidden" onClick={e => e.stopPropagation()}>
+                                {/* 頂部漸層裝飾 + 標題 */}
+                                <div className="bg-gradient-to-r from-teal-500 to-emerald-500 px-6 py-5 relative">
+                                    <button onClick={() => setShowFeedback(false)} className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white text-xs font-bold transition-colors">✕</button>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Icons.Mail /></div>
+                                        <div>
+                                            <h2 className="font-bold text-white text-lg">意見回饋</h2>
+                                            <p className="text-teal-100 text-xs">協助我們改善系統體驗</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                {/* 表單內容 */}
+                                <div className="p-6 space-y-5">
+                                    <div>
+                                        <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 mb-2">
+                                            <span className="w-5 h-5 bg-red-50 text-red-500 rounded flex items-center justify-center text-xs">!</span>
+                                            錯題回報
+                                        </label>
+                                        <textarea defaultValue={feedbackRef.current.errorReport} onChange={e => { feedbackRef.current.errorReport = e.target.value; }} placeholder="例：107-1_2302_06 圖片顯示異常" rows={2} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:bg-white focus:ring-2 focus:ring-teal-100 resize-none text-slate-700 placeholder-slate-400 transition-all"/>
+                                    </div>
+                                    <div>
+                                        <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 mb-2">
+                                            <span className="w-5 h-5 bg-teal-50 text-teal-500 rounded flex items-center justify-center text-xs">💡</span>
+                                            意見與建議
+                                        </label>
+                                        <textarea defaultValue={feedbackRef.current.suggestion} onChange={e => { feedbackRef.current.suggestion = e.target.value; }} placeholder="功能需求、改善建議或使用心得..." rows={4} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:bg-white focus:ring-2 focus:ring-teal-100 resize-none text-slate-700 placeholder-slate-400 transition-all"/>
+                                    </div>
+                                    {feedbackError && <div className="text-red-600 text-sm font-medium bg-red-50 border border-red-200 rounded-xl p-3 text-center">{feedbackError}</div>}
+                                    {feedbackSuccess && <div className="text-teal-700 text-sm font-medium bg-teal-50 border border-teal-200 rounded-xl p-3 text-center flex items-center justify-center gap-2"><Icons.Check className="w-4 h-4"/> {feedbackSuccess}</div>}
+                                    <div className="flex gap-3">
+                                        <button onClick={() => setShowFeedback(false)} className="flex-1 py-2.5 text-sm font-bold text-slate-500 border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors">取消</button>
+                                        <button onClick={sendFeedback} disabled={feedbackSending} className="flex-1 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 rounded-xl transition-all flex items-center justify-center gap-2">
+                                            {feedbackSending ? <><Icons.Loader2 className="w-4 h-4"/> 送出中...</> : '送出回饋'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -856,7 +968,7 @@
                 return () => subscription.unsubscribe();
             }, []);
 
-            const handleLogout = async () => { await supabase.auth.signOut(); setSession(null); };
+            const handleLogout = async () => { try { localStorage.removeItem('medtutor_login_time'); } catch {} await supabase.auth.signOut(); setSession(null); };
 
             if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-900"><Icons.Loader2 className="w-10 h-10 text-teal-500"/></div>;
             if (!session) return <LoginScreen onLogin={setSession} isDark={isDark} toggleTheme={toggleTheme} />;
