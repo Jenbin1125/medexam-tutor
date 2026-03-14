@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="台灣醫師二階國考 AI 臨床導師系統 — 知識圖譜 + AI 漸進式解析">
     <meta name="theme-color" content="#0f172a">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>">
     <title>醫師國考 AI 臨床導師</title>
-    
+
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -20,119 +22,253 @@
     <style>
         /* ── 色彩系統：CSS 自訂屬性 ── */
         :root {
-            --bg-body: #f8fafc; --bg-card: #ffffff; --bg-card-alt: #f1f5f9; --bg-input: #f8fafc;
-            --border-main: #e2e8f0; --border-light: #f1f5f9;
-            --text-primary: #1e293b; --text-secondary: #475569; --text-muted: #94a3b8;
-            --accent: #0d9488; --accent-bg: #f0fdfa; --accent-border: #99f6e4;
-            --img-brightness: 1; --img-saturate: 1;
+            --bg-body: #f8fafc;
+            --bg-card: #ffffff;
+            --bg-card-alt: #f1f5f9;
+            --bg-input: #f8fafc;
+            --border-main: #e2e8f0;
+            --border-light: #f1f5f9;
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --accent: #0d9488;
+            --accent-bg: #f0fdfa;
+            --accent-border: #99f6e4;
+            --img-brightness: 1;
+            --img-saturate: 1;
             --header-bg: #0f172a;
-            --scrollbar-track: #f1f5f9; --scrollbar-thumb: #cbd5e1;
+            --scrollbar-track: #f1f5f9;
+            --scrollbar-thumb: #cbd5e1;
         }
+
         html.dark {
-            /* 帶深藍色調的暗色背景，避免純黑 */
-            --bg-body: #111827; --bg-card: #1a2236; --bg-card-alt: #1f2b3f; --bg-input: #1f2b3f;
-            --border-main: #2d3a50; --border-light: #253045;
-            /* 文字使用 rgba 半透明白，避免純白刺眼 */
-            --text-primary: rgba(237,242,250,0.92); --text-secondary: rgba(196,210,230,0.82); --text-muted: rgba(148,168,196,0.6);
-            /* 降飽和的粉綠色 accent */
-            --accent: #5eead4; --accent-bg: rgba(94,234,212,0.08); --accent-border: rgba(94,234,212,0.25);
-            /* 深色模式圖片自動降亮度和飽和度 */
-            --img-brightness: 0.88; --img-saturate: 0.9;
+            --bg-body: #111827;
+            --bg-card: #1a2236;
+            --bg-card-alt: #1f2b3f;
+            --bg-input: #1f2b3f;
+            --border-main: #2d3a50;
+            --border-light: #253045;
+            --text-primary: rgba(237, 242, 250, 0.92);
+            --text-secondary: rgba(196, 210, 230, 0.82);
+            --text-muted: rgba(148, 168, 196, 0.6);
+            --accent: #5eead4;
+            --accent-bg: rgba(94, 234, 212, 0.08);
+            --accent-border: rgba(94, 234, 212, 0.25);
+            --img-brightness: 0.88;
+            --img-saturate: 0.9;
             --header-bg: #0c1322;
-            --scrollbar-track: #1a2236; --scrollbar-thumb: #2d3a50;
+            --scrollbar-track: #1a2236;
+            --scrollbar-thumb: #2d3a50;
         }
 
-        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; background-color: var(--bg-body); color: var(--text-primary); scroll-behavior: smooth; transition: background-color 0.3s, color 0.3s; }
+        body {
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            scroll-behavior: smooth;
+            transition: background-color 0.3s, color 0.3s;
+        }
 
-        /* ── 深色模式：全域覆寫 ── */
-        /* Tailwind bg-white → 用 card 色 */
-        html.dark .bg-white { background-color: var(--bg-card) !important; }
-        html.dark .bg-slate-50, html.dark .bg-slate-100 { background-color: var(--bg-card-alt) !important; }
-        html.dark .bg-slate-900 { background-color: var(--header-bg) !important; }
-        /* 邊框 */
-        html.dark .border-slate-200, html.dark .border-slate-100 { border-color: var(--border-main) !important; }
-        /* 文字 */
-        html.dark .text-slate-800, html.dark .text-slate-700 { color: var(--text-primary) !important; }
-        html.dark .text-slate-600, html.dark .text-slate-500 { color: var(--text-secondary) !important; }
-        html.dark .text-slate-400, html.dark .text-slate-300 { color: var(--text-muted) !important; }
-        /* Teal accent 降飽和 */
-        html.dark .text-teal-700, html.dark .text-teal-800, html.dark .text-teal-600 { color: var(--accent) !important; }
-        html.dark .bg-teal-50 { background-color: var(--accent-bg) !important; }
-        html.dark .bg-teal-100 { background-color: rgba(94,234,212,0.12) !important; }
-        html.dark .border-teal-200, html.dark .border-teal-400, html.dark .border-teal-500 { border-color: var(--accent-border) !important; }
-        html.dark .bg-teal-600 { background-color: #2dd4bf !important; color: #0f172a !important; }
-        /* 選項按鈕 */
-        html.dark .hover\:border-teal-400:hover { border-color: var(--accent-border) !important; }
-        html.dark .hover\:bg-teal-50:hover { background-color: var(--accent-bg) !important; }
-        /* 答題結果色 — 降飽和粉色系 */
-        html.dark .bg-green-100 { background-color: rgba(74,222,128,0.1) !important; }
-        html.dark .border-green-500 { border-color: rgba(74,222,128,0.4) !important; }
-        html.dark .text-green-800, html.dark .text-green-600 { color: #86efac !important; }
-        html.dark .bg-green-500 { background-color: #22c55e !important; }
-        html.dark .bg-red-50 { background-color: rgba(248,113,113,0.08) !important; }
-        html.dark .border-red-400, html.dark .border-red-300 { border-color: rgba(248,113,113,0.35) !important; }
-        html.dark .text-red-500, html.dark .text-red-700, html.dark .text-red-600 { color: #fca5a5 !important; }
-        html.dark .bg-red-500 { background-color: #ef4444 !important; }
-        html.dark .bg-yellow-400 { background-color: #ca8a04 !important; }
-        /* 收藏 amber 色降飽和 */
-        html.dark .bg-amber-500 { background-color: #d97706 !important; }
-        html.dark .bg-amber-100, html.dark .bg-amber-50 { background-color: rgba(251,191,36,0.08) !important; }
-        html.dark .border-amber-400, html.dark .border-amber-200, html.dark .border-amber-100 { border-color: rgba(251,191,36,0.25) !important; }
-        html.dark .text-amber-700, html.dark .text-amber-800, html.dark .text-amber-600 { color: #fbbf24 !important; }
-        /* Input */
-        html.dark input, html.dark input::placeholder { color: var(--text-secondary) !important; }
-        html.dark input { background-color: var(--bg-input) !important; border-color: var(--border-main) !important; }
-        html.dark input:focus { border-color: var(--accent) !important; }
-        /* 陰影移除，改用邊框層次 */
-        html.dark .shadow-sm, html.dark .shadow-md, html.dark .shadow-lg, html.dark .shadow-2xl { box-shadow: none !important; border: 1px solid var(--border-main); }
-        /* 圖片自動降亮度 */
-        html.dark img { filter: brightness(var(--img-brightness)) saturate(var(--img-saturate)); transition: filter 0.3s; }
-        /* Prose (Markdown 內容) */
-        html.dark .prose { color: var(--text-primary); }
-        html.dark .prose th { background-color: var(--bg-card-alt) !important; color: var(--text-primary) !important; }
-        html.dark .prose th, html.dark .prose td { border-color: var(--border-main) !important; }
-        html.dark .prose strong { color: var(--text-primary); }
-        html.dark .prose blockquote { border-left-color: var(--accent); color: var(--text-secondary); }
-        html.dark .prose code { background-color: var(--bg-card-alt); color: var(--accent); }
-        /* Mermaid */
-        html.dark .mermaid { background: var(--bg-card-alt); border-color: var(--border-main); }
-        /* 滾動條 */
-        html.dark ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
-        html.dark ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); }
-        /* 半透明覆蓋改良 */
-        html.dark .opacity-50 { opacity: 0.35 !important; }
-        /* 登入頁 */
-        html.dark .bg-gradient-to-br { background: linear-gradient(135deg, #0c1322, #111827, #0f2027) !important; }
+        html.dark .bg-white {
+            background-color: var(--bg-card) !important;
+        }
 
-        /* ── 非深色模式的既有樣式 ── */
-        .prose table { width: 100%; border-collapse: collapse; margin: 1rem 0; border-radius: 0.5rem; overflow: hidden; }
-        .prose th, .prose td { border: 1px solid var(--border-main); padding: 0.75rem 1rem; text-align: left; }
-        .prose th { background-color: var(--bg-card-alt); font-weight: 600; color: var(--text-primary); }
-        .mermaid { display: flex; justify-content: center; background: var(--bg-card); border: 1px solid var(--border-main); border-radius: 0.75rem; padding: 1.5rem; margin: 1.5rem 0; overflow-x: auto; cursor: pointer; position: relative; transition: all 0.3s ease; }
-        .mermaid::after { content: '🔍 點擊放大'; position: absolute; top: 8px; right: 12px; font-size: 11px; color: var(--text-muted); opacity: 0; transition: opacity 0.2s; pointer-events: none; }
-        .mermaid:hover::after { opacity: 1; }
-        .mermaid-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(15,23,42,0.92); animation: fadeIn 0.2s ease-out; }
-        .mermaid-close-btn { position: absolute; top: 16px; right: 20px; z-index: 10001; width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
-        .mermaid-close-btn:hover { background: rgba(255,255,255,0.3); }
-        .mermaid-viewport { width: 100%; height: 100%; overflow: hidden; cursor: grab; }
-        .mermaid-viewport:active { cursor: grabbing; }
-        .mermaid-viewport .mermaid-inner { display: flex; align-items: center; justify-content: center; min-width: 100%; min-height: 100%; }
-        .mermaid-viewport .mermaid-inner svg { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
-        .mermaid-zoom-controls { position: absolute; bottom: 20px; right: 20px; z-index: 10001; display: flex; gap: 8px; }
-        .mermaid-zoom-controls button { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
-        .mermaid-zoom-controls button:hover { background: rgba(255,255,255,0.3); }
-        .mermaid-zoom-level { position: absolute; bottom: 24px; left: 20px; z-index: 10001; color: rgba(255,255,255,0.5); font-size: 12px; font-weight: 600; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: var(--scrollbar-track); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
-        @keyframes pulse-star { 0%,100%{ transform:scale(1) } 50%{ transform:scale(1.3) } }
-        .star-pop { animation: pulse-star 0.3s ease-out; }
-        /* 模式切換按鈕動畫 */
-        .theme-toggle { transition: transform 0.3s ease; }
-        .theme-toggle:hover { transform: rotate(30deg); }
-        /* ── 題號跳轉列 ── */
+        html.dark .bg-slate-50,
+        html.dark .bg-slate-100 {
+            background-color: var(--bg-card-alt) !important;
+        }
+
+        html.dark .bg-slate-900 {
+            background-color: var(--header-bg) !important;
+        }
+
+        html.dark .border-slate-200,
+        html.dark .border-slate-100 {
+            border-color: var(--border-main) !important;
+        }
+
+        html.dark .text-slate-800,
+        html.dark .text-slate-700 {
+            color: var(--text-primary) !important;
+        }
+
+        html.dark .text-slate-600,
+        html.dark .text-slate-500 {
+            color: var(--text-secondary) !important;
+        }
+
+        html.dark .text-slate-400,
+        html.dark .text-slate-300 {
+            color: var(--text-muted) !important;
+        }
+
+        html.dark .text-teal-700,
+        html.dark .text-teal-800,
+        html.dark .text-teal-600 {
+            color: var(--accent) !important;
+        }
+
+        html.dark .bg-teal-50 {
+            background-color: var(--accent-bg) !important;
+        }
+
+        html.dark .bg-teal-100 {
+            background-color: rgba(94, 234, 212, 0.12) !important;
+        }
+
+        html.dark .border-teal-200,
+        html.dark .border-teal-400,
+        html.dark .border-teal-500 {
+            border-color: var(--accent-border) !important;
+        }
+
+        html.dark .bg-teal-600 {
+            background-color: #2dd4bf !important;
+            color: #0f172a !important;
+        }
+
+        html.dark .hover\:border-teal-400:hover {
+            border-color: var(--accent-border) !important;
+        }
+
+        html.dark .hover\:bg-teal-50:hover {
+            background-color: var(--accent-bg) !important;
+        }
+
+        html.dark .bg-green-100 {
+            background-color: rgba(74, 222, 128, 0.1) !important;
+        }
+
+        html.dark .border-green-500 {
+            border-color: rgba(74, 222, 128, 0.4) !important;
+        }
+
+        html.dark .text-green-800,
+        html.dark .text-green-600 {
+            color: #86efac !important;
+        }
+
+        html.dark .bg-green-500 {
+            background-color: #22c55e !important;
+        }
+
+        html.dark .bg-red-50 {
+            background-color: rgba(248, 113, 113, 0.08) !important;
+        }
+
+        html.dark .border-red-400,
+        html.dark .border-red-300 {
+            border-color: rgba(248, 113, 113, 0.35) !important;
+        }
+
+        html.dark .text-red-500,
+        html.dark .text-red-700,
+        html.dark .text-red-600 {
+            color: #fca5a5 !important;
+        }
+
+        html.dark .bg-red-500 {
+            background-color: #ef4444 !important;
+        }
+
+        html.dark .bg-yellow-400 {
+            background-color: #ca8a04 !important;
+        }
+
+        html.dark .bg-amber-500 {
+            background-color: #d97706 !important;
+        }
+
+        html.dark .bg-amber-100,
+        html.dark .bg-amber-50 {
+            background-color: rgba(251, 191, 36, 0.08) !important;
+        }
+
+        html.dark .border-amber-400,
+        html.dark .border-amber-200,
+        html.dark .border-amber-100 {
+            border-color: rgba(251, 191, 36, 0.25) !important;
+        }
+
+        html.dark .text-amber-700,
+        html.dark .text-amber-800,
+        html.dark .text-amber-600 {
+            color: #fbbf24 !important;
+        }
+
+        html.dark input,
+        html.dark input::placeholder {
+            color: var(--text-secondary) !important;
+        }
+
+        html.dark input {
+            background-color: var(--bg-input) !important;
+            border-color: var(--border-main) !important;
+        }
+
+        html.dark input:focus {
+            border-color: var(--accent) !important;
+        }
+
+        html.dark .shadow-sm,
+        html.dark .shadow-md,
+        html.dark .shadow-lg,
+        html.dark .shadow-2xl {
+            box-shadow: none !important;
+            border: 1px solid var(--border-main);
+        }
+
+        html.dark img {
+            filter: brightness(var(--img-brightness)) saturate(var(--img-saturate));
+            transition: filter 0.3s;
+        }
+
+        html.dark .prose {
+            color: var(--text-primary);
+        }
+
+        html.dark .prose th {
+            background-color: var(--bg-card-alt) !important;
+            color: var(--text-primary) !important;
+        }
+
+        html.dark .prose th,
+        html.dark .prose td {
+            border-color: var(--border-main) !important;
+        }
+
+        html.dark .prose strong {
+            color: var(--text-primary);
+        }
+
+        html.dark .prose blockquote {
+            border-left-color: var(--accent);
+            color: var(--text-secondary);
+        }
+
+        html.dark .prose code {
+            background-color: var(--bg-card-alt);
+            color: var(--accent);
+        }
+
+        html.dark .mermaid {
+            background: var(--bg-card-alt);
+            border-color: var(--border-main);
+        }
+
+        html.dark ::-webkit-scrollbar-track {
+            background: var(--scrollbar-track);
+        }
+
+        html.dark ::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb);
+        }
+
+        html.dark .opacity-50 {
+            opacity: 0.35 !important;
+        }
+
+        /* ── 導覽列數字選題按鈕 ── */
         .jump-bar { background: white; border: 1px solid #e2e8f0; }
         .jump-btn-default { background: white; color: #475569; border: 2px solid #e2e8f0; }
         .jump-btn-default:hover { border-color: #0d9488; color: #0d9488; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(13,148,136,0.15); }
@@ -145,8 +281,340 @@
         html.dark .jump-btn-correct { background: #065f46; border-color: #10b981; }
         html.dark .jump-btn-incorrect { background: #7f1d1d; border-color: #ef4444; }
         html.dark .jump-btn-viewed { background: #78350f; border-color: #f59e0b; }
+
+        /* ── 重置測驗按鈕 ── */
+        .btn-reset {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-shrink: 0;
+            padding: 0 12px;
+            height: 32px;
+            background: white;
+            color: #64748b;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: color 0.2s, border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-reset:hover {
+            color: #dc2626;
+            border-color: #fca5a5;
+            background: #fff5f5;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(220,38,38,0.12);
+        }
+        .btn-reset:hover .btn-reset-icon {
+            transform: rotate(-45deg);
+        }
+        .btn-reset-icon {
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            display: flex;
+            align-items: center;
+        }
+        html.dark .btn-reset {
+            background: transparent;
+            color: rgba(196,210,230,0.6);
+            border-color: #334155;
+        }
+        html.dark .btn-reset:hover {
+            color: #fca5a5;
+            border-color: #ef4444;
+            background: rgba(239,68,68,0.08);
+            box-shadow: 0 4px 12px rgba(239,68,68,0.15);
+        }
+
+        /* ── 題目左側題號圓形徽章：淺色模式白底灰框 ── */
+        .q-index-badge {
+            background-color: #ffffff;
+            border: 2px solid #e2e8f0;
+            color: #64748b;
+        }
+
+        /* 深色模式：保留深色樣式 */
+        html.dark .q-index-badge {
+            background-color: #1e293b !important;
+            border-color: transparent !important;
+            color: #94a3b8 !important;
+        }
+
+        html.dark .bg-gradient-to-br {
+            background: linear-gradient(135deg, #0c1322, #111827, #0f2027) !important;
+        }
+
+        .prose table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        .prose th,
+        .prose td {
+            border: 1px solid var(--border-main);
+            padding: 0.75rem 1rem;
+            text-align: left;
+        }
+
+        .prose th {
+            background-color: var(--bg-card-alt);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            background: var(--bg-card);
+            border: 1px solid var(--border-main);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .mermaid::after {
+            content: '🔍 點擊放大';
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            font-size: 11px;
+            color: var(--text-muted);
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+
+        .mermaid:hover::after {
+            opacity: 1;
+        }
+
+        .mermaid-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: rgba(15, 23, 42, 0.92);
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .mermaid-close-btn {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            z-index: 10001;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .mermaid-close-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .mermaid-viewport {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            cursor: grab;
+        }
+
+        .mermaid-viewport:active {
+            cursor: grabbing;
+        }
+
+        .mermaid-viewport .mermaid-inner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 100%;
+            min-height: 100%;
+        }
+
+        .mermaid-viewport .mermaid-inner svg {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .mermaid-zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 10001;
+            display: flex;
+            gap: 8px;
+        }
+
+        .mermaid-zoom-controls button {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .mermaid-zoom-controls button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .mermaid-zoom-level {
+            position: absolute;
+            bottom: 24px;
+            left: 20px;
+            z-index: 10001;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--scrollbar-track);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb);
+            border-radius: 4px;
+        }
+
+        @keyframes pulse-star {
+
+            0%,
+            100% {
+                transform: scale(1)
+            }
+
+            50% {
+                transform: scale(1.3)
+            }
+        }
+
+        .star-pop {
+            animation: pulse-star 0.3s ease-out;
+        }
+
+        .theme-toggle {
+            transition: transform 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            transform: rotate(30deg);
+        }
+
+        .jump-bar {
+            background: white;
+            border: 1px solid #e2e8f0;
+        }
+
+        .jump-btn-default {
+            background: white;
+            color: #475569;
+            border: 2px solid #e2e8f0;
+        }
+
+        .jump-btn-default:hover {
+            border-color: #0d9488;
+            color: #0d9488;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(13, 148, 136, 0.15);
+        }
+
+        .jump-btn-correct {
+            background: #10b981;
+            color: white;
+            border: 2px solid #059669;
+        }
+
+        .jump-btn-incorrect {
+            background: #ef4444;
+            color: white;
+            border: 2px solid #dc2626;
+        }
+
+        .jump-btn-viewed {
+            background: #f59e0b;
+            color: white;
+            border: 2px solid #d97706;
+        }
+
+        html.dark .jump-bar {
+            background: #0f172a;
+            border-color: #2d3a50;
+        }
+
+        html.dark .jump-btn-default {
+            background: transparent;
+            color: rgba(196, 210, 230, 0.7);
+            border-color: #334155;
+        }
+
+        html.dark .jump-btn-default:hover {
+            border-color: #38bdf8;
+            color: #38bdf8;
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
+        }
+
+        html.dark .jump-btn-correct {
+            background: #065f46;
+            border-color: #10b981;
+        }
+
+        html.dark .jump-btn-incorrect {
+            background: #7f1d1d;
+            border-color: #ef4444;
+        }
+
+        html.dark .jump-btn-viewed {
+            background: #78350f;
+            border-color: #f59e0b;
+        }
     </style>
 </head>
+
 <body>
     <div id="root"></div>
 
@@ -158,19 +626,28 @@
         const SUPABASE_STORAGE_BUCKET = 'exam_images';
 
         // ==========================================
-        // 預建索引
+        // 預建索引 (加入 Boolean 防呆過濾)
         // ==========================================
         const prebuiltIndex = (() => {
             const nodeKeywordIds = new Map();
             const uidToKeywords = new Map();
             const kwIdToUids = new Map();
             const processKeyword = (kw, nodeIds) => {
-                nodeIds.forEach(nid => { if (!nodeKeywordIds.has(nid)) nodeKeywordIds.set(nid, new Set()); nodeKeywordIds.get(nid).add(kw.id); });
-                if (kw.uids) { kwIdToUids.set(kw.id, kw.uids); kw.uids.forEach(uid => { if (!uidToKeywords.has(uid)) uidToKeywords.set(uid, new Set()); uidToKeywords.get(uid).add(kw.word); }); }
+                nodeIds.filter(Boolean).forEach(nid => {
+                    if (!nodeKeywordIds.has(nid)) nodeKeywordIds.set(nid, new Set());
+                    nodeKeywordIds.get(nid).add(kw.id);
+                });
+                if (kw.uids) {
+                    kwIdToUids.set(kw.id, kw.uids);
+                    kw.uids.forEach(uid => {
+                        if (!uidToKeywords.has(uid)) uidToKeywords.set(uid, new Set());
+                        uidToKeywords.get(uid).add(kw.word);
+                    });
+                }
             };
             knowledgeGraphData.forEach(dept => {
-                if (dept.isSubdivided) { (dept.children||[]).forEach(sub => { (sub.categories||[]).forEach(cat => { (cat.keywords||[]).forEach(kw => processKeyword(kw, [dept.id, sub.id])); }); }); }
-                else { (dept.categories||[]).forEach(cat => { (cat.keywords||[]).forEach(kw => processKeyword(kw, [dept.id])); }); }
+                if (dept.isSubdivided) { (dept.children || []).forEach(sub => { (sub.categories || []).forEach(cat => { (cat.keywords || []).forEach(kw => processKeyword(kw, [dept.id, sub.id])); }); }); }
+                else { (dept.categories || []).forEach(cat => { (cat.keywords || []).forEach(kw => processKeyword(kw, [dept.id])); }); }
             });
             return { nodeKeywordIds, uidToKeywords, kwIdToUids };
         })();
@@ -183,40 +660,42 @@
             return raw.split(',').map(s => s.trim()).filter(Boolean).map(part => {
                 if (part.startsWith('http') || part.startsWith('data:')) return part;
                 const p = part.startsWith('/') ? part.slice(1) : part;
-                return p.startsWith(SUPABASE_STORAGE_BUCKET+'/') ? `${SUPABASE_URL}/storage/v1/object/public/${p}` : `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_STORAGE_BUCKET}/${p}`;
+                return p.startsWith(SUPABASE_STORAGE_BUCKET + '/') ? `${SUPABASE_URL}/storage/v1/object/public/${p}` : `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_STORAGE_BUCKET}/${p}`;
             });
         };
         const SingleImage = ({ url, alt, maxH }) => {
             const [s, setS] = React.useState('loading');
-            return (<div className="relative">{s==='loading'&&<div className="flex items-center justify-center py-3 text-slate-300 text-xs"><Icons.Loader2 className="w-4 h-4 mr-1"/>載入中...</div>}<img src={url} alt={alt||''} className={`max-w-full mx-auto block ${maxH||'max-h-[500px]'} ${s==='error'?'hidden':''}`} onLoad={()=>setS('loaded')} onError={()=>setS('error')} loading="lazy" style={s==='loading'?{position:'absolute',opacity:0}:{}}/>{s==='error'&&<div className="text-xs text-slate-400 bg-slate-50 rounded p-1 border border-dashed border-slate-200 text-center">⚠️ 圖片載入失敗</div>}</div>);
+            return (<div className="relative">{s === 'loading' && <div className="flex items-center justify-center py-3 text-slate-300 text-xs"><Icons.Loader2 className="w-4 h-4 mr-1" />載入中...</div>}<img src={url} alt={alt || ''} className={`max-w-full mx-auto block ${maxH || 'max-h-[500px]'} ${s === 'error' ? 'hidden' : ''}`} onLoad={() => setS('loaded')} onError={() => setS('error')} loading="lazy" style={s === 'loading' ? { position: 'absolute', opacity: 0 } : {}} />{s === 'error' && <div className="text-xs text-slate-400 bg-slate-50 rounded p-1 border border-dashed border-slate-200 text-center">⚠️ 圖片載入失敗</div>}</div>);
         };
         const SmartImage = ({ src, alt, maxH, className }) => {
             const urls = resolveImageUrls(src);
             if (!urls.length) return null;
-            return <div className={className||''}>{urls.map((u,i)=><SingleImage key={i} url={u} alt={`${alt||''} (${i+1})`} maxH={maxH}/>)}</div>;
+            return <div className={className || ''}>{urls.map((u, i) => <SingleImage key={i} url={u} alt={`${alt || ''} (${i + 1})`} maxH={maxH} />)}</div>;
         };
 
         // ==========================================
         // Icons
         // ==========================================
         const Icons = {
-            Network: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>,
-            Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
-            ChevronRight: ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>,
-            Folder: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-teal-600"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>,
-            Brain: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/></svg>,
-            BookOpen: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
-            Target: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
-            Loader2: ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`animate-spin ${className||''}`}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>,
-            Check: ({className}) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>,
-            Star: ({filled, className}) => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill={filled?"#f59e0b":"none"} stroke={filled?"#f59e0b":"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className||''}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
-            LogOut: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
-            Mail: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>,
-            Shield: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>,
-            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
-            Moon: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>,
-            Sun: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>,
+            Network: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="16" y="16" width="6" height="6" rx="1" /><rect x="2" y="16" width="6" height="6" rx="1" /><rect x="9" y="2" width="6" height="6" rx="1" /><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3" /><path d="M12 12V8" /></svg>,
+            Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>,
+            ChevronRight: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6" /></svg>,
+            Folder: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-teal-600"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" /></svg>,
+            Brain: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" /><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" /><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" /><path d="M17.599 6.5a3 3 0 0 0 .399-1.375" /></svg>,
+            BookOpen: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg>,
+            Target: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>,
+            Loader2: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`animate-spin ${className || ''}`}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>,
+            Check: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12" /></svg>,
+            Star: ({ filled, className }) => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill={filled ? "#f59e0b" : "none"} stroke={filled ? "#f59e0b" : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className || ''}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>,
+            LogOut: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>,
+            Mail: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>,
+            Shield: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>,
+            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>,
+            RotateCcw: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>,
+            Moon: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" /></svg>,
+            Sun: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" /></svg>,
         };
+
         const MarkdownViewer = ({ content }) => {
             const r = React.useRef(null);
             React.useEffect(() => {
@@ -228,119 +707,84 @@
                     });
                     mermaid.initialize({ startOnLoad: false, theme: 'base', themeVariables: { primaryColor: '#f0fdfa', primaryTextColor: '#0f766e', primaryBorderColor: '#14b8a6', lineColor: '#0d9488' } });
                     mermaid.run({ nodes: n, suppressErrors: true }).then(() => {
-                        // 為每個 mermaid 圖加上點擊放大
                         n.forEach(node => {
                             if (node.dataset.zoomBound) return;
                             node.dataset.zoomBound = 'true';
                             node.addEventListener('click', () => {
                                 const svgEl = node.querySelector('svg');
                                 if (!svgEl) return;
-
-                                // 複製 SVG 並移除固定尺寸
                                 const svgClone = svgEl.cloneNode(true);
                                 svgClone.removeAttribute('width');
                                 svgClone.removeAttribute('height');
                                 svgClone.removeAttribute('style');
-
-                                // 取得原始 viewBox 來計算自適應大小
                                 const vb = svgClone.getAttribute('viewBox');
                                 let svgW = 800, svgH = 600;
                                 if (vb) { const p = vb.split(/\s+/); svgW = parseFloat(p[2]) || 800; svgH = parseFloat(p[3]) || 600; }
-
-                                // 計算 fit-to-view 的最佳縮放（留 10% 邊距）
                                 const padW = window.innerWidth * 0.9;
                                 const padH = window.innerHeight * 0.85;
                                 const fitScale = Math.min(padW / svgW, padH / svgH, 2.5);
-
                                 const fitted = Math.round(fitScale * 100) / 100;
                                 let curScale = fitted;
                                 let panX = 0, panY = 0;
                                 let isDragging = false, startX = 0, startY = 0, startPanX = 0, startPanY = 0;
-
-                                // 設定 SVG 大小
                                 svgClone.style.width = (svgW * curScale) + 'px';
                                 svgClone.style.height = (svgH * curScale) + 'px';
                                 svgClone.style.transition = 'width 0.2s, height 0.2s';
-
-                                // 建立 DOM
                                 const overlay = document.createElement('div');
                                 overlay.className = 'mermaid-overlay';
-
                                 const closeBtn = document.createElement('button');
                                 closeBtn.className = 'mermaid-close-btn';
                                 closeBtn.innerHTML = '✕';
-
                                 const viewport = document.createElement('div');
                                 viewport.className = 'mermaid-viewport';
                                 const inner = document.createElement('div');
                                 inner.className = 'mermaid-inner';
                                 inner.appendChild(svgClone);
                                 viewport.appendChild(inner);
-
                                 const controls = document.createElement('div');
                                 controls.className = 'mermaid-zoom-controls';
                                 const btnMinus = document.createElement('button'); btnMinus.textContent = '−';
                                 const btnReset = document.createElement('button'); btnReset.textContent = '⟲'; btnReset.style.fontSize = '14px';
                                 const btnPlus = document.createElement('button'); btnPlus.textContent = '+';
-                                controls.appendChild(btnMinus);
-                                controls.appendChild(btnReset);
-                                controls.appendChild(btnPlus);
-
+                                controls.appendChild(btnMinus); controls.appendChild(btnReset); controls.appendChild(btnPlus);
                                 const zoomLabel = document.createElement('div');
                                 zoomLabel.className = 'mermaid-zoom-level';
                                 const updateLabel = () => { zoomLabel.textContent = Math.round(curScale * 100) + '%'; };
                                 updateLabel();
-
-                                overlay.appendChild(closeBtn);
-                                overlay.appendChild(viewport);
-                                overlay.appendChild(controls);
-                                overlay.appendChild(zoomLabel);
-
-                                const applyTransform = () => {
-                                    inner.style.transform = 'translate(' + panX + 'px,' + panY + 'px)';
-                                    svgClone.style.width = (svgW * curScale) + 'px';
-                                    svgClone.style.height = (svgH * curScale) + 'px';
-                                    updateLabel();
-                                };
-
+                                overlay.appendChild(closeBtn); overlay.appendChild(viewport); overlay.appendChild(controls); overlay.appendChild(zoomLabel);
+                                const applyTransform = () => { inner.style.transform = 'translate(' + panX + 'px,' + panY + 'px)'; svgClone.style.width = (svgW * curScale) + 'px'; svgClone.style.height = (svgH * curScale) + 'px'; updateLabel(); };
                                 const zoom = (delta) => { curScale = Math.max(0.3, Math.min(4, curScale + delta)); applyTransform(); };
                                 btnPlus.addEventListener('click', (e) => { e.stopPropagation(); zoom(0.3); });
                                 btnMinus.addEventListener('click', (e) => { e.stopPropagation(); zoom(-0.3); });
                                 btnReset.addEventListener('click', (e) => { e.stopPropagation(); curScale = fitted; panX = 0; panY = 0; applyTransform(); });
-
-                                // 拖曳平移
                                 viewport.addEventListener('mousedown', (e) => { isDragging = true; startX = e.clientX; startY = e.clientY; startPanX = panX; startPanY = panY; });
                                 window.addEventListener('mousemove', (e) => { if (!isDragging) return; panX = startPanX + (e.clientX - startX); panY = startPanY + (e.clientY - startY); inner.style.transform = 'translate(' + panX + 'px,' + panY + 'px)'; });
                                 window.addEventListener('mouseup', () => { isDragging = false; });
-                                // 觸控拖曳
-                                viewport.addEventListener('touchstart', (e) => { const t = e.touches[0]; isDragging = true; startX = t.clientX; startY = t.clientY; startPanX = panX; startPanY = panY; }, {passive: true});
-                                viewport.addEventListener('touchmove', (e) => { if (!isDragging) return; const t = e.touches[0]; panX = startPanX + (t.clientX - startX); panY = startPanY + (t.clientY - startY); inner.style.transform = 'translate(' + panX + 'px,' + panY + 'px)'; }, {passive: true});
+                                viewport.addEventListener('touchstart', (e) => { const t = e.touches[0]; isDragging = true; startX = t.clientX; startY = t.clientY; startPanX = panX; startPanY = panY; }, { passive: true });
+                                viewport.addEventListener('touchmove', (e) => { if (!isDragging) return; const t = e.touches[0]; panX = startPanX + (t.clientX - startX); panY = startPanY + (t.clientY - startY); inner.style.transform = 'translate(' + panX + 'px,' + panY + 'px)'; }, { passive: true });
                                 viewport.addEventListener('touchend', () => { isDragging = false; });
-                                // 滾輪縮放
-                                viewport.addEventListener('wheel', (e) => { e.preventDefault(); zoom(e.deltaY < 0 ? 0.2 : -0.2); }, {passive: false});
-
-                                // 關閉
+                                viewport.addEventListener('wheel', (e) => { e.preventDefault(); zoom(e.deltaY < 0 ? 0.2 : -0.2); }, { passive: false });
                                 const closeOverlay = () => { overlay.remove(); };
                                 closeBtn.addEventListener('click', closeOverlay);
                                 document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { closeOverlay(); document.removeEventListener('keydown', esc); } });
-
                                 document.body.appendChild(overlay);
                             });
                         });
                     });
-                } catch (e) {}
+                } catch (e) { }
             }, [content]);
             const p = (md) => { if (!md) return ''; return marked.parse(md).replace(/<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g, '<div class="mermaid">$1</div>'); };
             return <div ref={r} className="prose prose-slate max-w-none w-full" dangerouslySetInnerHTML={{ __html: p(content) }} />;
         };
-        const LevelCard = ({title,content,icon,isOpen,onToggle}) => { if(!content) return null; return (<div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-3"><button onClick={onToggle} className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors focus:outline-none"><div className="flex items-center gap-3"><div className="text-teal-600">{icon}</div><h3 className="font-bold text-slate-800 text-sm">{title}</h3></div><Icons.ChevronRight className={`transition-transform duration-300 ${isOpen?'rotate-90':''}`}/></button>{isOpen&&<div className="p-5 border-t border-slate-100 animate-fade-in bg-white text-sm"><MarkdownViewer content={content}/></div>}</div>)};
-        const CircularProgress = ({completed,total}) => { const pct=total===0?0:Math.round((completed/total)*100); const r=14; const c=2*Math.PI*r; return (<div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">{completed}/{total}</span><svg width="36" height="36" className="transform -rotate-90"><circle cx="18" cy="18" r={r} stroke="#f1f5f9" strokeWidth="4" fill="none"/><circle cx="18" cy="18" r={r} stroke="#0d9488" strokeWidth="4" fill="none" strokeDasharray={c} strokeDashoffset={c-(pct/100)*c} className="transition-all duration-500 ease-out"/></svg></div>)};
+
+        const LevelCard = ({ title, content, icon, isOpen, onToggle }) => { if (!content) return null; return (<div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-3"><button onClick={onToggle} className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors focus:outline-none"><div className="flex items-center gap-3"><div className="text-teal-600">{icon}</div><h3 className="font-bold text-slate-800 text-sm">{title}</h3></div><Icons.ChevronRight className={`transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`} /></button>{isOpen && <div className="p-5 border-t border-slate-100 animate-fade-in bg-white text-sm"><MarkdownViewer content={content} /></div>}</div>) };
+        const CircularProgress = ({ completed, total }) => { const pct = total === 0 ? 0 : Math.round((completed / total) * 100); const r = 14; const c = 2 * Math.PI * r; return (<div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-400">{completed}/{total}</span><svg width="36" height="36" className="transform -rotate-90"><circle cx="18" cy="18" r={r} stroke="#f1f5f9" strokeWidth="4" fill="none" /><circle cx="18" cy="18" r={r} stroke="#0d9488" strokeWidth="4" fill="none" strokeDasharray={c} strokeDashoffset={c - (pct / 100) * c} className="transition-all duration-500 ease-out" /></svg></div>) };
 
         // ==========================================
         // 🔐 登入畫面
         // ==========================================
         function LoginScreen({ onLogin, isDark, toggleTheme }) {
-            const [step, setStep] = React.useState('email'); // email | otp | sending
+            const [step, setStep] = React.useState('email');
             const [email, setEmail] = React.useState('');
             const [otp, setOtp] = React.useState('');
             const [error, setError] = React.useState('');
@@ -352,25 +796,13 @@
                 setError('');
                 const trimmed = email.trim().toLowerCase();
                 if (!trimmed) { setError('請輸入 Email'); return; }
-
                 setStep('sending');
                 try {
-                    // 檢查 email 是否在允許名單中
                     const { data: allowed } = await supabase.from('allowed_emails').select('email').eq('email', trimmed).maybeSingle();
                     if (!allowed) { setError('此 Email 不在允許名單中，請聯繫管理員。'); setStep('email'); return; }
-
-                    // 發送 OTP（強制使用 6 位數驗證碼，不發 magic link）
-                    const { error: otpErr } = await supabase.auth.signInWithOtp({
-                        email: trimmed,
-                        options: {
-                            shouldCreateUser: true,
-                            // 不傳 emailRedirectTo → Supabase 不會產生 magic link，只發 OTP 碼
-                        }
-                    });
+                    const { error: otpErr } = await supabase.auth.signInWithOtp({ email: trimmed, options: { shouldCreateUser: true } });
                     if (otpErr) throw otpErr;
-
-                    setStep('otp');
-                    setCountdown(60);
+                    setStep('otp'); setCountdown(60);
                 } catch (e) { setError(e.message || '發送驗證碼失敗'); setStep('email'); }
             };
 
@@ -393,25 +825,21 @@
                             <h1 className="text-2xl font-bold text-slate-800">AI 臨床導師系統</h1>
                             <p className="text-slate-500 text-sm mt-1">醫師二階國考知識圖譜</p>
                         </div>
-
                         {step === 'email' && (
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-bold text-slate-600 mb-2">醫院 Email</label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400"><Icons.Mail /></div>
-                                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendOtp()}
-                                            placeholder="name@hospital.org.tw" className="w-full pl-11 pr-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 text-slate-700 font-medium"/>
+                                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendOtp()} placeholder="name@hospital.org.tw" className="w-full pl-11 pr-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 text-slate-700 font-medium" />
                                     </div>
                                 </div>
                                 <button onClick={handleSendOtp} className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition-colors shadow-md">發送驗證碼</button>
                             </div>
                         )}
-
                         {step === 'sending' && (
                             <div className="text-center py-8"><Icons.Loader2 className="w-8 h-8 mx-auto text-teal-600 mb-3" /><p className="text-slate-500 font-medium">驗證中，請稍候...</p></div>
                         )}
-
                         {step === 'otp' && (
                             <div className="space-y-4">
                                 <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 text-center">
@@ -420,17 +848,14 @@
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-slate-600 mb-2">輸入信件中的驗證碼</label>
-                                    <input type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g,'').slice(0,8))} onKeyDown={e => e.key === 'Enter' && handleVerifyOtp()}
-                                        placeholder="請輸入數字驗證碼" maxLength={8} className="w-full text-center text-2xl tracking-[0.3em] py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 font-mono text-slate-700"/>
+                                    <input type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))} onKeyDown={e => e.key === 'Enter' && handleVerifyOtp()} placeholder="請輸入數字驗證碼" maxLength={8} className="w-full text-center text-2xl tracking-[0.3em] py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 font-mono text-slate-700" />
                                 </div>
                                 <button onClick={handleVerifyOtp} className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition-colors shadow-md">驗證登入</button>
-                                <button onClick={() => { if(countdown <= 0) { setOtp(''); handleSendOtp(); }}} disabled={countdown > 0}
-                                    className={`w-full py-2 text-sm font-medium rounded-xl transition-colors ${countdown > 0 ? 'text-slate-400 bg-slate-50' : 'text-teal-600 hover:bg-teal-50'}`}>
+                                <button onClick={() => { if (countdown <= 0) { setOtp(''); handleSendOtp(); } }} disabled={countdown > 0} className={`w-full py-2 text-sm font-medium rounded-xl transition-colors ${countdown > 0 ? 'text-slate-400 bg-slate-50' : 'text-teal-600 hover:bg-teal-50'}`}>
                                     {countdown > 0 ? `${countdown} 秒後可重新發送` : '重新發送驗證碼'}
                                 </button>
                             </div>
                         )}
-
                         {error && <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm font-medium text-center">{error}</div>}
                     </div>
                 </div>
@@ -441,13 +866,31 @@
         // 🏥 主應用程式
         // ==========================================
         function MainApp({ session, onLogout, isDark, toggleTheme }) {
-            const [activeTab, setActiveTab] = React.useState('graph');
+            const userId = session?.user?.id;
+
+            // 1. 記憶狀態與防呆解析
+            const [activeTab, setActiveTab] = React.useState(() => {
+                try { return localStorage.getItem(`medtutor_tab_${userId}`) || 'graph'; } catch { return 'graph'; }
+            });
+            const [selectedContext, setSelectedContext] = React.useState(() => {
+                try {
+                    const saved = localStorage.getItem(`medtutor_context_${userId}`);
+                    const parsed = saved ? JSON.parse(saved) : null;
+                    return parsed || { subject: '', sub: '', category: '', keyword: null };
+                } catch { return { subject: '', sub: '', category: '', keyword: null }; }
+            });
+            const [qStates, setQStates] = React.useState(() => {
+                try {
+                    const saved = localStorage.getItem(`medtutor_qStates_${userId}`);
+                    const parsed = saved ? JSON.parse(saved) : null;
+                    return parsed || {};
+                } catch { return {}; }
+            });
+
             const [searchQuery, setSearchQuery] = React.useState('');
-            const [selectedContext, setSelectedContext] = React.useState({ subject:'', sub:'', category:'', keyword:null });
             const [completedKeywords, setCompletedKeywords] = React.useState(new Set());
             const [selectedQuestions, setSelectedQuestions] = React.useState([]);
             const [loadingQuestions, setLoadingQuestions] = React.useState(false);
-            const [qStates, setQStates] = React.useState({});
             const [starredUids, setStarredUids] = React.useState(new Set());
             const [starredQuestions, setStarredQuestions] = React.useState([]);
             const [loadingStarred, setLoadingStarred] = React.useState(false);
@@ -457,60 +900,88 @@
             const [showAdmin, setShowAdmin] = React.useState(false);
             const [adminEmails, setAdminEmails] = React.useState([]);
             const [newEmail, setNewEmail] = React.useState('');
-            const [showFeedback, setShowFeedback] = React.useState(false);
-            const [feedbackError, setFeedbackError] = React.useState('');
-            const [feedbackSuccess, setFeedbackSuccess] = React.useState('');
-            const [feedbackSending, setFeedbackSending] = React.useState(false);
-            const feedbackRef = React.useRef({ errorReport: '', suggestion: '' });
-            const userId = session?.user?.id;
+            // --- 意見回饋 State ---
+            const [showFeedbackModal, setShowFeedbackModal] = React.useState(false);
+            const [feedbackType, setFeedbackType] = React.useState('question_error');
+            const [feedbackContent, setFeedbackContent] = React.useState('');
+            const [isSubmittingFeedback, setIsSubmittingFeedback] = React.useState(false);
+            const [feedbackMsg, setFeedbackMsg] = React.useState('');
 
-            // ── 24 小時自動登出機制 ──
-            React.useEffect(() => {
-                if (!session) return;
-                const SESSION_DURATION = 23 * 3600 * 1000 + 59 * 60 * 1000 + 59 * 1000; // 23:59:59
-                const loginKey = 'medtutor_login_time';
-                let loginTime = null;
-                try { loginTime = parseInt(localStorage.getItem(loginKey)); } catch {}
-                if (!loginTime || isNaN(loginTime)) {
-                    loginTime = Date.now();
-                    try { localStorage.setItem(loginKey, String(loginTime)); } catch {}
-                }
-                const elapsed = Date.now() - loginTime;
-                const remaining = SESSION_DURATION - elapsed;
-                if (remaining <= 0) {
-                    // 已過期，立即登出
-                    try { localStorage.removeItem(loginKey); } catch {}
-                    onLogout();
+            // --- 意見回饋提交邏輯 ---
+            const handleFeedbackSubmit = async () => {
+                if (!feedbackContent.trim()) {
+                    setFeedbackMsg('請填寫回饋內容');
                     return;
                 }
-                // 設定倒計時登出
-                const timer = setTimeout(() => {
-                    try { localStorage.removeItem(loginKey); } catch {}
-                    alert('登入時間已滿 24 小時，系統將自動登出。');
-                    onLogout();
-                }, remaining);
-                return () => clearTimeout(timer);
-            }, [session]);
 
-            // ── 初始化：載入進度 + 收藏 + 管理員狀態 ──
+                setIsSubmittingFeedback(true);
+                setFeedbackMsg('');
+
+                try {
+                    const { error } = await supabase.from('user_feedback').insert({
+                        user_id: userId,
+                        email: session?.user?.email,
+                        type: feedbackType,
+                        content: feedbackContent,
+                        // 系統會依據你的 SQL 設定自動補上 created_at
+                    });
+
+                    if (error) throw error;
+
+                    setFeedbackMsg('回饋已送出，感謝您的意見！');
+
+                    // 延遲兩秒後自動關閉彈窗並清空表單
+                    setTimeout(() => {
+                        setShowFeedbackModal(false);
+                        setFeedbackContent('');
+                        setFeedbackType('question_error');
+                        setFeedbackMsg('');
+                    }, 2000);
+
+                } catch (e) {
+                    setFeedbackMsg('發送失敗：' + (e.message || '發生未知錯誤'));
+                } finally {
+                    setIsSubmittingFeedback(false);
+                }
+            };
+            // ── LocalStorage 寫入機制 ──
+            React.useEffect(() => {
+                if (userId) localStorage.setItem(`medtutor_tab_${userId}`, activeTab);
+            }, [activeTab, userId]);
+
+            React.useEffect(() => {
+                if (userId && selectedContext) {
+                    localStorage.setItem(`medtutor_context_${userId}`, JSON.stringify(selectedContext));
+                }
+            }, [selectedContext, userId]);
+
+            React.useEffect(() => {
+                if (userId && qStates && Object.keys(qStates).length > 0) {
+                    try {
+                        const stateToSave = Object.entries(qStates).reduce((acc, [uid, state]) => {
+                            if (state && (state.status !== 'unanswered' || state.showExpl)) { acc[uid] = state; }
+                            return acc;
+                        }, {});
+                        localStorage.setItem(`medtutor_qStates_${userId}`, JSON.stringify(stateToSave));
+                    } catch (e) { console.error("儲存 qStates 失敗:", e); }
+                }
+            }, [qStates, userId]);
+
+            // ── Supabase 資料載入 ──
             React.useEffect(() => {
                 if (!userId) return;
                 (async () => {
-                    // 載入學習進度
                     const { data: prog } = await supabase.from('user_progress').select('completed_keywords').eq('user_id', userId).maybeSingle();
                     if (prog?.completed_keywords) setCompletedKeywords(new Set(prog.completed_keywords));
 
-                    // 載入收藏
                     const { data: stars } = await supabase.from('user_starred').select('question_uid').eq('user_id', userId);
                     if (stars) setStarredUids(new Set(stars.map(s => s.question_uid)));
 
-                    // 檢查管理員
                     const { data: adm } = await supabase.from('admin_users').select('id').eq('user_id', userId).maybeSingle();
                     setIsAdmin(!!adm);
                 })();
             }, [userId]);
 
-            // ── 進度同步到 Supabase（防抖） ──
             const saveTimerRef = React.useRef(null);
             React.useEffect(() => {
                 if (!userId) return;
@@ -522,7 +993,6 @@
                 return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
             }, [completedKeywords, userId]);
 
-            // ── 收藏操作 ──
             const toggleStar = async (uid) => {
                 const isStarred = starredUids.has(uid);
                 const next = new Set(starredUids);
@@ -536,7 +1006,6 @@
                 setStarredUids(next);
             };
 
-            // ── 載入考前複習資料夾 ──
             const loadStarredQuestions = async () => {
                 if (starredUids.size === 0) { setStarredQuestions([]); return; }
                 setLoadingStarred(true);
@@ -547,43 +1016,16 @@
             };
             React.useEffect(() => { if (activeTab === 'review') loadStarredQuestions(); }, [activeTab, starredUids]);
 
-            // ── 管理員功能 ──
             const loadAdminEmails = async () => { const { data } = await supabase.from('allowed_emails').select('*').order('created_at', { ascending: false }); setAdminEmails(data || []); };
             const addEmail = async () => {
                 const e = newEmail.trim().toLowerCase();
                 if (!e) return;
                 await supabase.from('allowed_emails').insert({ email: e });
-                setNewEmail('');
-                loadAdminEmails();
+                setNewEmail(''); loadAdminEmails();
             };
             const removeEmail = async (id) => { await supabase.from('allowed_emails').delete().eq('id', id); loadAdminEmails(); };
             React.useEffect(() => { if (showAdmin) loadAdminEmails(); }, [showAdmin]);
 
-            // ── 意見回饋（存入 Supabase，同時嘗試 Edge Function 寄信）──
-            const sendFeedback = async () => {
-                const { errorReport, suggestion } = feedbackRef.current;
-                if (!errorReport.trim() && !suggestion.trim()) { setFeedbackError('請至少填寫一個欄位'); return; }
-                setFeedbackSending(true);
-                setFeedbackError('');
-                setFeedbackSuccess('');
-                try {
-                    const senderEmail = session?.user?.email || 'unknown';
-                    // 存入 Supabase feedback 表（確保回饋不丟失）
-                    const { error: dbErr } = await supabase.from('user_feedback').insert({
-                        user_id: userId,
-                        sender_email: senderEmail,
-                        error_report: errorReport.trim(),
-                        suggestion: suggestion.trim(),
-                    });
-                    if (dbErr) throw dbErr;
-                    setFeedbackSuccess('回饋已送出，感謝您的意見！');
-                    setTimeout(() => { setShowFeedback(false); setFeedbackSuccess(''); feedbackRef.current = { errorReport: '', suggestion: '' }; }, 2000);
-                } catch (e) {
-                    setFeedbackError('送出失敗：' + (e.message || '未知錯誤'));
-                } finally { setFeedbackSending(false); }
-            };
-
-            // ── 進度計算 ──
             const getProgress = React.useCallback((nodeId) => {
                 const kwIds = prebuiltIndex.nodeKeywordIds.get(nodeId);
                 if (!kwIds) return { completed: 0, total: 0 };
@@ -592,7 +1034,7 @@
                 return { completed, total: kwIds.size };
             }, [completedKeywords]);
 
-            // ── 載入題目 ──
+            // ── 載入題目（保留已作答記憶） ──
             React.useEffect(() => {
                 const fetchDB = async () => {
                     const kw = selectedContext.keyword;
@@ -603,27 +1045,64 @@
                         if (!uids?.length) { setSelectedQuestions([]); return; }
                         const { data } = await supabase.from('questions').select('*').in('uid', uids);
                         setSelectedQuestions(data || []);
-                        const init = {};
-                        (data || []).forEach(q => { init[q.uid] = { answerSelected: null, status: 'unanswered', openStates: [true, false, false] }; });
-                        setQStates(init);
+                        setQStates(prev => {
+                            const next = { ...prev };
+                            (data || []).forEach(q => {
+                                if (!next[q.uid]) {
+                                    next[q.uid] = { answerSelected: null, status: 'unanswered', openStates: [true, false, false], showExpl: false };
+                                }
+                            });
+                            return next;
+                        });
                     } catch (e) { console.error(e); } finally { setLoadingQuestions(false); }
                 };
                 fetchDB();
             }, [selectedContext.keyword]);
 
-            const handleAnswer = (uid, opt, ans) => setQStates(p => ({...p, [uid]: { ...p[uid], answerSelected: opt, status: ans.includes(opt) ? 'correct' : 'incorrect' }}));
+            const handleAnswer = (uid, opt, ans) => setQStates(p => ({ ...p, [uid]: { ...p[uid], answerSelected: opt, status: ans.includes(opt) ? 'correct' : 'incorrect' } }));
             const handleShowAI = (uid) => setQStates(p => ({ ...p, [uid]: { ...p[uid], status: p[uid].status === 'unanswered' ? 'viewed' : p[uid].status, showExpl: true } }));
             const toggleKw = (kwId) => setCompletedKeywords(p => { const n = new Set(p); n.has(kwId) ? n.delete(kwId) : n.add(kwId); return n; });
             const scrollToQ = (uid) => document.getElementById(`q-${uid}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-            // ── 搜尋 ──
+            // ── 重置本地記憶與測驗狀態 ──
+            const handleResetLocalMemory = () => {
+                const confirmMsg = "確定要清除所有「本地記憶」嗎？\n\n這將會重置您所有的單題對錯與解析展開紀錄。\n（請放心：您的「考前複習」收藏與「圖譜單元打勾」進度已安全備份至資料庫，不會被清除）";
+
+                if (window.confirm(confirmMsg)) {
+                    // 1. 清除瀏覽器 LocalStorage 的綁定紀錄
+                    localStorage.removeItem(`medtutor_tab_${userId}`);
+                    localStorage.removeItem(`medtutor_context_${userId}`);
+                    localStorage.removeItem(`medtutor_qStates_${userId}`);
+
+                    // 2. 重新初始化前端目前的作答狀態 (讓畫面即時更新為未作答，不需重新整理網頁)
+                    setQStates(prev => {
+                        const reset = {};
+                        selectedQuestions.forEach(q => {
+                            reset[q.uid] = {
+                                answerSelected: null,
+                                status: 'unanswered',
+                                openStates: [true, false, false],
+                                showExpl: false
+                            };
+                        });
+                        return reset;
+                    });
+
+                    // 註：如果您希望學生按完重置後，系統自動跳回「知識圖譜」首頁，
+                    // 可以把下面這兩行的註解打開：
+                    // setActiveTab('graph');
+                    // setSelectedContext({ subject:'', sub:'', category:'', keyword:null });
+                }
+            };
+
+            // ── 搜尋（防呆空白處理） ──
             const filteredData = React.useMemo(() => {
                 if (!searchQuery.trim()) return knowledgeGraphData;
-                const lq = searchQuery.toLowerCase();
+                const lq = searchQuery.toLowerCase().trim().replace(/\s+/g, ' ');
                 const match = (kw) => kw.word.toLowerCase().includes(lq) || (kw.aliases && kw.aliases.some(a => a.toLowerCase().includes(lq)));
                 return knowledgeGraphData.map(dept => {
                     const nd = { ...dept, children: [], categories: [] };
-                    const fc = (cats) => cats.map(cat => ({...cat, keywords: cat.keywords.filter(match)})).filter(cat => cat.keywords.length > 0);
+                    const fc = (cats) => cats.map(cat => ({ ...cat, keywords: cat.keywords.filter(match) })).filter(cat => cat.keywords.length > 0);
                     if (dept.isSubdivided) { dept.children.forEach(sub => { const f = fc(sub.categories); if (f.length > 0) nd.children.push({ ...sub, categories: f }); }); }
                     else nd.categories = fc(dept.categories);
                     return nd;
@@ -631,10 +1110,9 @@
             }, [searchQuery]);
 
             const TreeNode = ({ label, icon, isExpanded, onClick, children, badge, isKeyword, isCompleted, onToggleComplete, isColdNode }) => (
-                <div className="mb-1"><div onClick={onClick} className={`flex items-center justify-between p-3 rounded-xl cursor-pointer border transition-all duration-200 ${isExpanded?'bg-teal-50 border-teal-200 text-teal-800':'border-transparent text-slate-700 hover:-translate-y-0.5 hover:border-slate-200 hover:shadow-md'}`}><div className="flex items-center gap-3">{isKeyword&&<button onClick={(e)=>{e.stopPropagation();onToggleComplete();}} className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${isCompleted?'bg-teal-500 border-teal-500 text-white':'border-slate-300 bg-white'}`}>{isCompleted&&<Icons.Check className="w-3 h-3"/>}</button>}{!isKeyword&&icon}<span className={`font-bold ${isCompleted?'text-slate-400 line-through decoration-slate-300':''} ${isColdNode?'text-slate-500 font-medium':''}`}>{label}</span></div><div className="flex items-center gap-3">{badge&&<span className={`text-xs px-2.5 py-1 rounded-full font-bold ${isCompleted?'bg-slate-100 text-slate-400':isColdNode?'bg-slate-100 text-slate-500':'bg-teal-100 text-teal-700'}`}>{badge} 題</span>}{children&&<Icons.ChevronRight className={`text-slate-400 transition-transform ${isExpanded?'rotate-90':''}`}/>}</div></div>{isExpanded&&children&&<div className="ml-5 pl-4 border-l-2 border-slate-100 mt-1 pb-2">{children}</div>}</div>
+                <div className="mb-1"><div onClick={onClick} className={`flex items-center justify-between p-3 rounded-xl cursor-pointer border transition-all duration-200 ${isExpanded ? 'bg-teal-50 border-teal-200 text-teal-800' : 'border-transparent text-slate-700 hover:-translate-y-0.5 hover:border-slate-200 hover:shadow-md'}`}><div className="flex items-center gap-3">{isKeyword && <button onClick={(e) => { e.stopPropagation(); onToggleComplete(); }} className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${isCompleted ? 'bg-teal-500 border-teal-500 text-white' : 'border-slate-300 bg-white'}`}>{isCompleted && <Icons.Check className="w-3 h-3" />}</button>}{!isKeyword && icon}<span className={`font-bold ${isCompleted ? 'text-slate-400 line-through decoration-slate-300' : ''} ${isColdNode ? 'text-slate-500 font-medium' : ''}`}>{label}</span></div><div className="flex items-center gap-3">{badge && <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${isCompleted ? 'bg-slate-100 text-slate-400' : isColdNode ? 'bg-slate-100 text-slate-500' : 'bg-teal-100 text-teal-700'}`}>{badge} 題</span>}{children && <Icons.ChevronRight className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />}</div></div>{isExpanded && children && <div className="ml-5 pl-4 border-l-2 border-slate-100 mt-1 pb-2">{children}</div>}</div>
             );
 
-            // ── 共用題目渲染（mode: 'explain' | 'review'）──
             const renderQuestion = (q, idx, qState, mode = 'explain') => {
                 const explJSON = q.ai_explanation;
                 const officialAns = q.correct_answer || (explJSON?.level_1?.correct_option || '');
@@ -643,8 +1121,8 @@
                     const gO = (o) => explJSON.level_2?.rule_out?.[o] || explJSON.level_2?.rule_out?.[o.toLowerCase()] || "無";
                     explLevels = [
                         `**Pivot Point 核心關鍵**：\n${explJSON.level_1.key_takeaway}\n\n**正確答案**：${explJSON.level_1.correct_option}`,
-                        `**機制回顧**：\n${explJSON.level_2?.recall||''}\n\n**選項分析**：\n- (A) ${gO('A')}\n- (B) ${gO('B')}\n- (C) ${gO('C')}\n- (D) ${gO('D')}`,
-                        `**臨床通則**：\n${explJSON.level_3?.general_principles||''}\n\n\`\`\`mermaid\n${explJSON.level_3?.mermaid_code||''}\n\`\`\`\n\n**💎 臨床珍珠**：\n> ${explJSON.level_3?.clinical_pearl||''}`
+                        `**機制回顧**：\n${explJSON.level_2?.recall || ''}\n\n**選項分析**：\n- (A) ${gO('A')}\n- (B) ${gO('B')}\n- (C) ${gO('C')}\n- (D) ${gO('D')}`,
+                        `**臨床通則**：\n${explJSON.level_3?.general_principles || ''}\n\n\`\`\`mermaid\n${explJSON.level_3?.mermaid_code || ''}\n\`\`\`\n\n**💎 臨床珍珠**：\n> ${explJSON.level_3?.clinical_pearl || ''}`
                     ];
                 }
                 const st = qState || {};
@@ -652,7 +1130,10 @@
                 return (
                     <div id={`q-${q.uid}`} key={q.uid} className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 scroll-mt-[105px]">
                         <div className="flex gap-4">
-                            <div className="flex-shrink-0 w-8 h-8 bg-slate-100 text-slate-600 font-bold rounded-full flex items-center justify-center">{idx + 1}</div>
+                            {/* 題目左側的大圓形題號 */}
+                            <div className="flex-shrink-0 w-8 h-8 q-index-badge font-bold rounded-full flex items-center justify-center">
+                                {idx + 1}
+                            </div>
                             <div className="flex-1">
                                 <div className="flex justify-between items-start mb-2">
                                     <div className="flex items-center gap-2">
@@ -667,7 +1148,7 @@
                                 <div className="whitespace-pre-wrap text-slate-800 text-lg leading-relaxed font-medium mb-4">{q.question_content}</div>
                                 <SmartImage src={q.img_q} alt={`題目 ${q.uid} 附圖`} maxH="max-h-[500px]" className="my-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50" />
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-                                    {['A','B','C','D'].map(opt => {
+                                    {['A', 'B', 'C', 'D'].map(opt => {
                                         const optText = q[`option_${opt.toLowerCase()}`];
                                         const optImg = q[`img_${opt.toLowerCase()}`];
                                         if (!optText && !optImg) return null;
@@ -677,22 +1158,21 @@
                                             else if (opt === st.answerSelected) bs = "bg-red-50 border-2 border-red-400 text-red-700";
                                             else bs = "bg-slate-50 border-2 border-slate-100 text-slate-400 opacity-50";
                                         }
-                                        return <button key={opt} disabled={!!st.answerSelected} onClick={() => handleAnswer(q.uid, opt, officialAns)} className={`text-left p-4 rounded-xl transition-all ${bs}`}><span className="font-bold mr-2">({opt})</span> {optText}<SmartImage src={optImg} alt={`選項${opt}`} maxH="max-h-[200px]" className="mt-2"/></button>;
+                                        return <button key={opt} disabled={!!st.answerSelected} onClick={() => handleAnswer(q.uid, opt, officialAns)} className={`text-left p-4 rounded-xl transition-all ${bs}`}><span className="font-bold mr-2">({opt})</span> {optText}<SmartImage src={optImg} alt={`選項${opt}`} maxH="max-h-[200px]" className="mt-2" /></button>;
                                     })}
                                 </div>
 
-                                {/* 模組三(review)：在選項下方直接顯示移出按鈕 */}
                                 {isReview && (
                                     <div className="flex justify-end mb-4">
                                         <button onClick={() => toggleStar(q.uid)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm bg-red-50 border-2 border-red-300 text-red-600 hover:bg-red-100">
-                                            <Icons.Star filled className="w-4 h-4"/> 移出資料夾
+                                            <Icons.Star filled className="w-4 h-4" /> 移出資料夾
                                         </button>
                                     </div>
                                 )}
 
                                 {st.answerSelected && !st.showExpl && (
                                     <div className="flex items-center gap-4 mb-4 animate-fade-in">
-                                        {st.status==='correct'?<span className="text-green-600 font-bold text-lg flex items-center gap-1"><Icons.Check className="w-5 h-5"/>答對了！</span>:<span className="text-red-500 font-bold text-lg">答錯囉，正確答案是 {officialAns}</span>}
+                                        {st.status === 'correct' ? <span className="text-green-600 font-bold text-lg flex items-center gap-1"><Icons.Check className="w-5 h-5" />答對了！</span> : <span className="text-red-500 font-bold text-lg">答錯囉，正確答案是 {officialAns}</span>}
                                         <button onClick={() => handleShowAI(q.uid)} className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-teal-600 text-white font-semibold rounded-xl transition-all shadow-sm"><Icons.Brain /> 觀看 AI 導師解析</button>
                                     </div>
                                 )}
@@ -700,22 +1180,21 @@
                                 {st.showExpl && (
                                     <div className="mt-6 pt-6 border-t border-slate-100 animate-fade-in">
                                         {!explJSON ? <div className="text-amber-600 font-medium p-3 bg-amber-50 rounded-lg">這題的 AI 解析尚未生成喔！</div> :
-                                         explJSON.error ? <div className="text-red-500 font-medium p-3 bg-red-50 rounded-lg">AI 解析生成失敗。</div> :
-                                         explLevels && (<>
-                                            <div className="inline-block bg-teal-100 text-teal-800 text-sm font-bold px-3 py-1 rounded-full mb-4">🤖 AI 臨床導師漸進式解析</div>
-                                            <LevelCard title="Level 1: 核心觀念即時回饋" content={explLevels[0]} icon={<Icons.Target />} isOpen={st.openStates?.[0]} onToggle={() => {const o=[...st.openStates];o[0]=!o[0];setQStates(p=>({...p,[q.uid]:{...p[q.uid],openStates:o}}))}} />
-                                            <LevelCard title="Level 2: 臨床推理與選項排除" content={explLevels[1]} icon={<Icons.Brain />} isOpen={st.openStates?.[1]} onToggle={() => {const o=[...st.openStates];o[1]=!o[1];setQStates(p=>({...p,[q.uid]:{...p[q.uid],openStates:o}}))}} />
-                                            <LevelCard title="Level 3: 通則統整與決策流程" content={explLevels[2]} icon={<Icons.BookOpen />} isOpen={st.openStates?.[2]} onToggle={() => {const o=[...st.openStates];o[2]=!o[2];setQStates(p=>({...p,[q.uid]:{...p[q.uid],openStates:o}}))}} />
-                                            {/* 模組二：收藏按鈕在 Level 3 下方 */}
-                                            {!isReview && (
-                                                <div className="flex justify-end mt-4">
-                                                    <button onClick={() => toggleStar(q.uid)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm ${starredUids.has(q.uid) ? 'bg-amber-100 border-2 border-amber-400 text-amber-700 hover:bg-amber-50' : 'bg-amber-500 hover:bg-amber-600 text-white border-2 border-amber-500'}`}>
-                                                        <Icons.Star filled={starredUids.has(q.uid)} className="w-4 h-4"/>
-                                                        {starredUids.has(q.uid) ? '已收藏（點擊移出）' : '收藏至考前複習'}
-                                                    </button>
-                                                </div>
-                                            )}
-                                         </>)}
+                                            explJSON.error ? <div className="text-red-500 font-medium p-3 bg-red-50 rounded-lg">AI 解析生成失敗。</div> :
+                                                explLevels && (<>
+                                                    <div className="inline-block bg-teal-100 text-teal-800 text-sm font-bold px-3 py-1 rounded-full mb-4">🤖 AI 臨床導師漸進式解析</div>
+                                                    <LevelCard title="Level 1: 核心觀念即時回饋" content={explLevels[0]} icon={<Icons.Target />} isOpen={st.openStates?.[0]} onToggle={() => { const o = [...st.openStates]; o[0] = !o[0]; setQStates(p => ({ ...p, [q.uid]: { ...p[q.uid], openStates: o } })) }} />
+                                                    <LevelCard title="Level 2: 臨床推理與選項排除" content={explLevels[1]} icon={<Icons.Brain />} isOpen={st.openStates?.[1]} onToggle={() => { const o = [...st.openStates]; o[1] = !o[1]; setQStates(p => ({ ...p, [q.uid]: { ...p[q.uid], openStates: o } })) }} />
+                                                    <LevelCard title="Level 3: 通則統整與決策流程" content={explLevels[2]} icon={<Icons.BookOpen />} isOpen={st.openStates?.[2]} onToggle={() => { const o = [...st.openStates]; o[2] = !o[2]; setQStates(p => ({ ...p, [q.uid]: { ...p[q.uid], openStates: o } })) }} />
+                                                    {!isReview && (
+                                                        <div className="flex justify-end mt-4">
+                                                            <button onClick={() => toggleStar(q.uid)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm ${starredUids.has(q.uid) ? 'bg-amber-100 border-2 border-amber-400 text-amber-700 hover:bg-amber-50' : 'bg-amber-500 hover:bg-amber-600 text-white border-2 border-amber-500'}`}>
+                                                                <Icons.Star filled={starredUids.has(q.uid)} className="w-4 h-4" />
+                                                                {starredUids.has(q.uid) ? '已收藏（點擊移出）' : '收藏至考前複習'}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </>)}
                                     </div>
                                 )}
                             </div>
@@ -726,41 +1205,59 @@
 
             return (
                 <div className="min-h-screen flex flex-col">
-                    <header className="bg-slate-900 text-white sticky top-0 z-30 border-b border-slate-700/50">
-                        <div className="max-w-5xl mx-auto px-4 h-12 flex items-center">
-                            {/* Logo + 標題 */}
-                            <div className="flex items-center gap-2.5 mr-5 flex-shrink-0">
-                                <div className="bg-gradient-to-br from-teal-400 to-emerald-500 p-1.5 rounded-lg"><Icons.Network /></div>
-                                <span className="font-bold text-sm tracking-wide hidden sm:block text-slate-200">AI 臨床導師</span>
+                    <header className="bg-slate-900 text-white shadow-md sticky top-0 z-30">
+                        <div className="max-w-4xl mx-auto px-4 py-2 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-gradient-to-br from-teal-400 to-teal-600 p-1.5 rounded-lg shadow"><Icons.Network /></div>
+                                <h1 className="text-base font-bold tracking-wide hidden md:block">AI 臨床導師</h1>
                             </div>
-                            {/* Tab 導航 */}
-                            <nav className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto">
-                                {[{id:'graph',label:'1. 知識圖譜',icon:'📊'},{id:'ai-explain',label:'2. 測驗詳解',icon:'🧠'},{id:'review',label:`3. 考前複習`,icon:'⭐'}].map(tab => (
-                                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`relative px-3 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${activeTab===tab.id ? 'bg-teal-500/20 text-teal-300' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}>
-                                        {tab.label}{tab.id==='review' && starredUids.size > 0 && <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px]">{starredUids.size}</span>}
-                                        {activeTab===tab.id && <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-teal-400 rounded-full"/>}
-                                    </button>
-                                ))}
-                            </nav>
-                            {/* 右側工具列 */}
-                            <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                                <span className="text-[10px] text-slate-500 hidden xl:block mr-1 max-w-[140px] truncate">{session?.user?.email}</span>
-                                {isAdmin && <button onClick={() => setShowAdmin(!showAdmin)} className="p-1.5 rounded-md text-slate-500 hover:text-amber-400 hover:bg-slate-800 transition-colors" title="管理員"><Icons.Shield /></button>}
-                                <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
-                                <button onClick={() => { setShowFeedback(true); setFeedbackError(''); setFeedbackSuccess(''); }} className="p-1.5 rounded-md text-slate-500 hover:text-sky-400 hover:bg-slate-800 transition-colors" title="意見回饋"><Icons.Mail /></button>
-                                <div className="w-px h-5 bg-slate-700 mx-0.5"></div>
-                                <button onClick={onLogout} className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors" title="登出"><Icons.LogOut /></button>
+
+                            <div className="flex items-center gap-2">
+                                {/* 導覽頁籤 */}
+                                <div className="flex gap-1 mr-2 bg-slate-800 p-1 rounded-xl">
+                                    {[{ id: 'graph', label: '知識圖譜', icon: <Icons.Network /> }, { id: 'ai-explain', label: '導師解析', icon: <Icons.Brain /> }, { id: 'review', label: `考前複習 (${starredUids.size})`, icon: <Icons.BookOpen /> }].map(tab => (
+                                        <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 ${activeTab === tab.id ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}>
+                                            <span className="w-4 h-4 flex items-center justify-center">{tab.icon}</span>
+                                            <span className="hidden sm:inline">{tab.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* 意見回饋按鈕 */}
+                                <button onClick={() => setShowFeedbackModal(true)} className="text-xs text-slate-300 hover:text-teal-400 flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-slate-800 transition-colors hidden sm:flex border border-slate-700">
+                                    <span className="w-4 h-4 flex items-center justify-center"><Icons.Mail /></span>
+                                    <span>意見回饋</span>
+                                </button>
+
+                                {/* 管理員按鈕 */}
+                                {isAdmin && <button onClick={() => setShowAdmin(!showAdmin)} className={`p-1.5 rounded-lg transition-colors ${showAdmin ? 'bg-amber-500 text-white' : 'text-slate-400 hover:text-amber-400 hover:bg-slate-700'}`} title="管理員設定"><Icons.Shield /></button>}
+
+                                {/* 使用者 Email */}
+                                <span className="text-[10px] text-slate-500 hidden lg:block ml-2">{session?.user?.email}</span>
+
+                                {/* 淺/深色模式切換 */}
+                                <div className="ml-1">
+                                    <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+                                </div>
+
+                                {/* 分隔線 */}
+                                <div className="w-px h-5 bg-slate-700 mx-1"></div>
+
+                                {/* 登出按鈕 */}
+                                <button onClick={onLogout} className="text-xs text-slate-400 hover:text-red-400 flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-slate-800 transition-colors" title="登出">
+                                    <Icons.LogOut />
+                                    <span className="hidden sm:inline">登出</span>
+                                </button>
                             </div>
                         </div>
                     </header>
 
-                    {/* 管理員面板 */}
                     {showAdmin && isAdmin && (
                         <div className="max-w-4xl w-full mx-auto p-4">
                             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 animate-fade-in">
-                                <h2 className="font-bold text-amber-800 mb-4 flex items-center gap-2"><Icons.Shield /> 管理員：允許登入 Email 名單</h2>
+                                <h2 className="font-bold text-amber-800 mb-4 flex items-center gap-2"><Icons.Shield /> 管理員名單</h2>
                                 <div className="flex gap-2 mb-4">
-                                    <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} onKeyDown={e => e.key==='Enter'&&addEmail()} placeholder="new@hospital.org.tw" className="flex-1 px-4 py-2 border-2 border-amber-200 rounded-xl focus:outline-none focus:border-amber-400 text-sm"/>
+                                    <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && addEmail()} placeholder="new@hospital.org.tw" className="flex-1 px-4 py-2 border-2 border-amber-200 rounded-xl focus:outline-none focus:border-amber-400 text-sm" />
                                     <button onClick={addEmail} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-sm">新增</button>
                                 </div>
                                 <div className="space-y-2 max-h-60 overflow-y-auto">
@@ -775,132 +1272,132 @@
                         </div>
                     )}
 
-                    {/* 意見回饋彈窗 */}
-                    {showFeedback && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowFeedback(false)} style={{background:'rgba(15,23,42,0.7)',backdropFilter:'blur(6px)'}}>
-                            <div className="bg-white rounded-2xl w-full max-w-md animate-fade-in overflow-hidden" onClick={e => e.stopPropagation()}>
-                                {/* 頂部漸層裝飾 + 標題 */}
-                                <div className="bg-gradient-to-r from-teal-500 to-emerald-500 px-6 py-5 relative">
-                                    <button onClick={() => setShowFeedback(false)} className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white text-xs font-bold transition-colors">✕</button>
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><Icons.Mail /></div>
-                                        <div>
-                                            <h2 className="font-bold text-white text-lg">意見回饋</h2>
-                                            <p className="text-teal-100 text-xs">協助我們改善系統體驗</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                {/* 表單內容 */}
-                                <div className="p-6 space-y-5">
-                                    <div>
-                                        <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 mb-2">
-                                            <span className="w-5 h-5 bg-red-50 text-red-500 rounded flex items-center justify-center text-xs">!</span>
-                                            錯題回報
-                                        </label>
-                                        <textarea defaultValue={feedbackRef.current.errorReport} onChange={e => { feedbackRef.current.errorReport = e.target.value; }} placeholder="例：107-1_2302_06 圖片顯示異常" rows={2} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:bg-white focus:ring-2 focus:ring-teal-100 resize-none text-slate-700 placeholder-slate-400 transition-all"/>
-                                    </div>
-                                    <div>
-                                        <label className="flex items-center gap-1.5 text-sm font-bold text-slate-700 mb-2">
-                                            <span className="w-5 h-5 bg-teal-50 text-teal-500 rounded flex items-center justify-center text-xs">💡</span>
-                                            意見與建議
-                                        </label>
-                                        <textarea defaultValue={feedbackRef.current.suggestion} onChange={e => { feedbackRef.current.suggestion = e.target.value; }} placeholder="功能需求、改善建議或使用心得..." rows={4} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:bg-white focus:ring-2 focus:ring-teal-100 resize-none text-slate-700 placeholder-slate-400 transition-all"/>
-                                    </div>
-                                    {feedbackError && <div className="text-red-600 text-sm font-medium bg-red-50 border border-red-200 rounded-xl p-3 text-center">{feedbackError}</div>}
-                                    {feedbackSuccess && <div className="text-teal-700 text-sm font-medium bg-teal-50 border border-teal-200 rounded-xl p-3 text-center flex items-center justify-center gap-2"><Icons.Check className="w-4 h-4"/> {feedbackSuccess}</div>}
-                                    <div className="flex gap-3">
-                                        <button onClick={() => setShowFeedback(false)} className="flex-1 py-2.5 text-sm font-bold text-slate-500 border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors">取消</button>
-                                        <button onClick={sendFeedback} disabled={feedbackSending} className="flex-1 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 rounded-xl transition-all flex items-center justify-center gap-2">
-                                            {feedbackSending ? <><Icons.Loader2 className="w-4 h-4"/> 送出中...</> : '送出回饋'}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
                     <main className="flex-1 max-w-4xl w-full mx-auto p-4 md:p-6 pb-20">
-                        {/* ── Tab 1: 知識圖譜 ── */}
-                        <div className={activeTab==='graph'?'block animate-fade-in':'hidden'}>
+                        <div className={activeTab === 'graph' ? 'block animate-fade-in' : 'hidden'}>
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <div className="relative mb-8">
                                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Icons.Search /></div>
-                                    <input type="text" placeholder="搜尋醫學關鍵字 (支援英文：AKI, COPD, CHF)..." className="w-full pl-11 pr-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl text-lg focus:outline-none focus:border-teal-500 focus:bg-white transition-all font-bold text-slate-700 placeholder-slate-400 shadow-inner" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}/>
+                                    <input type="text" placeholder="搜尋醫學關鍵字 (支援英文：AKI, COPD, CHF)..." className="w-full pl-11 pr-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl text-lg focus:outline-none focus:border-teal-500 focus:bg-white transition-all font-bold text-slate-700 placeholder-slate-400 shadow-inner" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                                 </div>
                                 <div className="max-w-3xl mx-auto">
-                                    {filteredData.length===0&&<div className="text-center py-12 text-slate-400 font-bold">找不到符合「{searchQuery}」的考點。</div>}
-                                    {filteredData.map(dept => { const dp = getProgress(dept.id); return (
-                                        <div key={dept.id} className="mb-2">
-                                            <div onClick={() => setSelectedContext(prev => prev.subject===dept.name&&!prev.sub&&!prev.category ? {subject:'',sub:'',category:'',keyword:null} : {subject:dept.name,sub:'',category:'',keyword:null})} className={`flex items-center justify-between p-4 rounded-xl cursor-pointer border-2 transition-all ${selectedContext.subject===dept.name?'border-teal-400 bg-teal-50 shadow-md':'border-slate-100 hover:border-slate-300 bg-white shadow-sm'}`}>
-                                                <div className="flex items-center gap-3"><div className="p-2 bg-slate-100 rounded-lg text-slate-600"><Icons.Folder /></div><h2 className="text-lg font-bold text-slate-800">{dept.name}</h2></div>
-                                                <div className="flex items-center gap-4"><CircularProgress completed={dp.completed} total={dp.total} /><Icons.ChevronRight className={`text-slate-400 transition-transform ${selectedContext.subject===dept.name?'rotate-90':''}`}/></div>
-                                            </div>
-                                            {selectedContext.subject===dept.name&&(
-                                                <div className="ml-6 pl-4 border-l-4 border-slate-100 mt-3 mb-6">
-                                                    {dept.isSubdivided&&dept.children.map(sub => (
-                                                        <TreeNode key={sub.id} label={sub.name} icon={<Icons.Folder />} isExpanded={selectedContext.sub===sub.name} onClick={(e) => {e.stopPropagation();setSelectedContext(prev => prev.sub===sub.name&&!prev.category?{subject:dept.name,sub:'',category:'',keyword:null}:{subject:dept.name,sub:sub.name,category:'',keyword:null});}}>
-                                                            {sub.categories.map((cat,i) => { const ic=cat.name.includes('冷門'); return (
-                                                                <TreeNode key={i} label={cat.name} icon={<Icons.Folder />} isExpanded={selectedContext.category===cat.name&&selectedContext.sub===sub.name} isColdNode={ic} onClick={(e) => {e.stopPropagation();setSelectedContext(prev => prev.category===cat.name&&!prev.keyword?{subject:dept.name,sub:sub.name,category:'',keyword:null}:{subject:dept.name,sub:sub.name,category:cat.name,keyword:null});}}>
-                                                                    {cat.keywords.map(kw => (<TreeNode key={kw.id} label={kw.word} badge={kw.count} isKeyword isCompleted={completedKeywords.has(kw.id)} onToggleComplete={() => toggleKw(kw.id)} isExpanded={selectedContext.keyword?.id===kw.id} isColdNode={ic} onClick={(e) => {e.stopPropagation();setSelectedContext({subject:dept.name,sub:sub.name,category:cat.name,keyword:kw});setActiveTab('ai-explain');}}/>))}
-                                                                </TreeNode>
-                                                            )})}
-                                                        </TreeNode>
-                                                    ))}
-                                                    {!dept.isSubdivided&&dept.categories.map((cat,i) => { const ic=cat.name.includes('冷門'); return (
-                                                        <TreeNode key={i} label={cat.name} icon={<Icons.Folder />} isExpanded={selectedContext.category===cat.name&&selectedContext.subject===dept.name} isColdNode={ic} onClick={(e) => {e.stopPropagation();setSelectedContext(prev => prev.category===cat.name&&!prev.keyword?{subject:dept.name,sub:'',category:'',keyword:null}:{subject:dept.name,sub:'',category:cat.name,keyword:null});}}>
-                                                            {cat.keywords.map(kw => (<TreeNode key={kw.id} label={kw.word} badge={kw.count} isKeyword isCompleted={completedKeywords.has(kw.id)} onToggleComplete={() => toggleKw(kw.id)} isExpanded={selectedContext.keyword?.id===kw.id} isColdNode={ic} onClick={(e) => {e.stopPropagation();setSelectedContext({subject:dept.name,sub:'',category:cat.name,keyword:kw});setActiveTab('ai-explain');}}/>))}
-                                                        </TreeNode>
-                                                    )})}
+                                    {filteredData.length === 0 && <div className="text-center py-12 text-slate-400 font-bold">找不到符合「{searchQuery}」的考點。</div>}
+                                    {filteredData.map(dept => {
+                                        const dp = getProgress(dept.id); return (
+                                            <div key={dept.id} className="mb-2">
+                                                <div onClick={() => setSelectedContext(prev => prev.subject === dept.name && !prev.sub && !prev.category ? { subject: '', sub: '', category: '', keyword: null } : { subject: dept.name, sub: '', category: '', keyword: null })} className={`flex items-center justify-between p-4 rounded-xl cursor-pointer border-2 transition-all ${selectedContext.subject === dept.name ? 'border-teal-400 bg-teal-50 shadow-md' : 'border-slate-100 hover:border-slate-300 bg-white shadow-sm'}`}>
+                                                    <div className="flex items-center gap-3"><div className="p-2 bg-slate-100 rounded-lg text-slate-600"><Icons.Folder /></div><h2 className="text-lg font-bold text-slate-800">{dept.name}</h2></div>
+                                                    <div className="flex items-center gap-4"><CircularProgress completed={dp.completed} total={dp.total} /><Icons.ChevronRight className={`text-slate-400 transition-transform ${selectedContext.subject === dept.name ? 'rotate-90' : ''}`} /></div>
                                                 </div>
-                                            )}
-                                        </div>
-                                    )})}
+                                                {selectedContext.subject === dept.name && (
+                                                    <div className="ml-6 pl-4 border-l-4 border-slate-100 mt-3 mb-6">
+                                                        {dept.isSubdivided && dept.children.map(sub => (
+                                                            <TreeNode key={sub.id} label={sub.name} icon={<Icons.Folder />} isExpanded={selectedContext.sub === sub.name} onClick={(e) => { e.stopPropagation(); setSelectedContext(prev => prev.sub === sub.name && !prev.category ? { subject: dept.name, sub: '', category: '', keyword: null } : { subject: dept.name, sub: sub.name, category: '', keyword: null }); }}>
+                                                                {sub.categories.map((cat, i) => {
+                                                                    const ic = cat.name.includes('冷門'); return (
+                                                                        <TreeNode key={i} label={cat.name} icon={<Icons.Folder />} isExpanded={selectedContext.category === cat.name && selectedContext.sub === sub.name} isColdNode={ic} onClick={(e) => { e.stopPropagation(); setSelectedContext(prev => prev.category === cat.name && !prev.keyword ? { subject: dept.name, sub: sub.name, category: '', keyword: null } : { subject: dept.name, sub: sub.name, category: cat.name, keyword: null }); }}>
+                                                                            {cat.keywords.map(kw => (<TreeNode key={kw.id} label={kw.word} badge={kw.count} isKeyword isCompleted={completedKeywords.has(kw.id)} onToggleComplete={() => toggleKw(kw.id)} isExpanded={selectedContext.keyword?.id === kw.id} isColdNode={ic} onClick={(e) => { e.stopPropagation(); setSelectedContext({ subject: dept.name, sub: sub.name, category: cat.name, keyword: kw }); setActiveTab('ai-explain'); }} />))}
+                                                                        </TreeNode>
+                                                                    )
+                                                                })}
+                                                            </TreeNode>
+                                                        ))}
+                                                        {!dept.isSubdivided && dept.categories.map((cat, i) => {
+                                                            const ic = cat.name.includes('冷門'); return (
+                                                                <TreeNode key={i} label={cat.name} icon={<Icons.Folder />} isExpanded={selectedContext.category === cat.name && selectedContext.subject === dept.name} isColdNode={ic} onClick={(e) => { e.stopPropagation(); setSelectedContext(prev => prev.category === cat.name && !prev.keyword ? { subject: dept.name, sub: '', category: '', keyword: null } : { subject: dept.name, sub: '', category: cat.name, keyword: null }); }}>
+                                                                    {cat.keywords.map(kw => (<TreeNode key={kw.id} label={kw.word} badge={kw.count} isKeyword isCompleted={completedKeywords.has(kw.id)} onToggleComplete={() => toggleKw(kw.id)} isExpanded={selectedContext.keyword?.id === kw.id} isColdNode={ic} onClick={(e) => { e.stopPropagation(); setSelectedContext({ subject: dept.name, sub: '', category: cat.name, keyword: kw }); setActiveTab('ai-explain'); }} />))}
+                                                                </TreeNode>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
                                 </div>
                             </div>
                         </div>
 
-                        {/* ── Tab 2: 導師詳解測驗區 ── */}
-                        <div className={activeTab==='ai-explain'?'block animate-fade-in':'hidden'}>
+                        <div className={activeTab === 'ai-explain' ? 'block animate-fade-in' : 'hidden'}>
                             {!selectedContext.keyword ? (
                                 <div className="text-center p-12 text-slate-400 font-bold bg-white rounded-2xl border border-slate-200">請先由圖譜選擇一個關鍵字單元。</div>
                             ) : (
                                 <div>
-                                    <div className="mb-4"><h2 className="text-3xl font-bold text-slate-800 border-l-4 border-teal-500 pl-4">{selectedContext.keyword.word}</h2></div>
-                                    {loadingQuestions ? <div className="text-center text-teal-600 font-bold py-12"><Icons.Loader2 className="w-8 h-8 mx-auto mb-2"/>撈取中...</div> : (
+                                    <div className="mb-4">
+                                        <h2 className="text-3xl font-bold text-slate-800 border-l-4 border-teal-500 pl-4">{selectedContext.keyword.word}</h2>
+                                    </div>
+
+                                    {loadingQuestions ? (
+                                        <div className="text-center text-teal-600 font-bold py-12">
+                                            <Icons.Loader2 className="w-8 h-8 mx-auto mb-2" />撈取中...
+                                        </div>
+                                    ) : (
                                         <div className="relative">
-                                            <div className="jump-bar px-3 py-2 rounded-xl mb-4 sticky top-[48px] z-10">
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {selectedQuestions.map((q,idx) => { const s=qStates[q.uid]?.status||'unanswered'; let bc="jump-btn-default"; if(s==='correct')bc="jump-btn-correct";else if(s==='incorrect')bc="jump-btn-incorrect";else if(s==='viewed')bc="jump-btn-viewed"; return <button key={q.uid} onClick={() => scrollToQ(q.uid)} className={`w-8 h-8 rounded-lg font-bold text-xs transition-all ${bc}`}>{idx+1}</button>})}
+                                            {/* ── 導覽跳題列與重置按鈕 ── */}
+                                            <div className="jump-bar px-3 py-2 rounded-xl mb-4 sticky top-[48px] z-10 flex items-start justify-between gap-4 shadow-sm backdrop-blur-sm">
+                                                <div className="flex flex-wrap gap-1.5 flex-1">
+                                                    {selectedQuestions.map((q, idx) => {
+                                                        const s = qStates[q.uid]?.status || 'unanswered';
+                                                        // 預設樣式：淺色模式白底灰框，深色模式深色底
+                                                        // 狀態對應 jump-btn-* class（與 index_記憶.html 一致）
+                                                        let bc = "jump-btn-default";
+
+                                                        if (s === 'correct') {
+                                                            bc = "jump-btn-correct";
+                                                        } else if (s === 'incorrect') {
+                                                            bc = "jump-btn-incorrect";
+                                                        } else if (s === 'viewed') {
+                                                            bc = "jump-btn-viewed";
+                                                        }
+
+                                                        return (
+                                                            <button
+                                                                key={q.uid}
+                                                                onClick={() => scrollToQ(q.uid)}
+                                                                className={`w-8 h-8 rounded-lg font-bold text-xs transition-all ${bc}`}
+                                                            >
+                                                                {idx + 1}
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
+
+                                                <button
+                                                    onClick={handleResetLocalMemory}
+                                                    className="btn-reset"
+                                                    title="清除所有本地作答紀錄，重新測驗"
+                                                >
+                                                    <span className="btn-reset-icon"><Icons.RotateCcw /></span>
+                                                    <span className="hidden sm:inline">重置測驗</span>
+                                                </button>
                                             </div>
-                                            <div className="space-y-8">{selectedQuestions.map((q,idx) => renderQuestion(q, idx, qStates[q.uid]))}</div>
+
+                                            {/* ── 題目渲染區塊 ── */}
+                                            <div className="space-y-8">
+                                                {selectedQuestions.map((q, idx) => renderQuestion(q, idx, qStates[q.uid]))}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
                             )}
                         </div>
 
-                        {/* ── Tab 3: 考前複習資料夾（分頁） ── */}
-                        <div className={activeTab==='review'?'block animate-fade-in':'hidden'}>
+                        <div className={activeTab === 'review' ? 'block animate-fade-in' : 'hidden'}>
                             {starredUids.size === 0 ? (
                                 <div className="text-center p-12 text-slate-400 font-bold bg-white rounded-2xl border border-slate-200">
-                                    <Icons.Star filled={false} className="w-12 h-12 mx-auto mb-3 text-slate-300"/>
+                                    <Icons.Star filled={false} className="w-12 h-12 mx-auto mb-3 text-slate-300" />
                                     <p>尚未收藏任何考題</p>
                                     <p className="text-xs mt-1">在「導師詳解測驗區」看完 AI 解析後點擊 ⭐ 即可收藏</p>
                                 </div>
                             ) : loadingStarred ? (
-                                <div className="text-center text-teal-600 font-bold py-12"><Icons.Loader2 className="w-8 h-8 mx-auto mb-2"/>載入中...</div>
+                                <div className="text-center text-teal-600 font-bold py-12"><Icons.Loader2 className="w-8 h-8 mx-auto mb-2" />載入中...</div>
                             ) : (() => {
                                 const totalPages = Math.ceil(starredQuestions.length / REVIEW_PAGE_SIZE);
                                 const safePage = Math.min(reviewPage, totalPages - 1);
                                 const pageItems = starredQuestions.slice(safePage * REVIEW_PAGE_SIZE, (safePage + 1) * REVIEW_PAGE_SIZE);
                                 return (
                                     <div>
-                                        {/* 分頁控制列 */}
                                         <div className="flex items-center justify-between mb-4 bg-white rounded-xl border border-slate-200 px-4 py-3">
-                                            <span className="text-sm font-bold text-slate-600">
-                                                共 {starredQuestions.length} 題收藏
-                                            </span>
+                                            <span className="text-sm font-bold text-slate-600">共 {starredQuestions.length} 題收藏</span>
                                             <div className="flex items-center gap-2">
                                                 <button disabled={safePage === 0} onClick={() => setReviewPage(p => p - 1)} className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${safePage === 0 ? 'text-slate-300 bg-slate-50' : 'text-teal-700 bg-teal-50 hover:bg-teal-100'}`}>上一頁</button>
                                                 <span className="text-sm text-slate-500 font-mono">{safePage + 1} / {totalPages}</span>
@@ -910,11 +1407,10 @@
                                         <div className="space-y-6">
                                             {pageItems.map((q, idx) => renderQuestion(q, safePage * REVIEW_PAGE_SIZE + idx, qStates[q.uid] || { answerSelected: null, status: 'unanswered', openStates: [false, false, false] }, 'review'))}
                                         </div>
-                                        {/* 底部分頁 */}
                                         {totalPages > 1 && (
                                             <div className="flex justify-center gap-2 mt-6">
-                                                {Array.from({length: totalPages}, (_, i) => (
-                                                    <button key={i} onClick={() => { setReviewPage(i); window.scrollTo({top: 0, behavior: 'smooth'}); }} className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${i === safePage ? 'bg-teal-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{i + 1}</button>
+                                                {Array.from({ length: totalPages }, (_, i) => (
+                                                    <button key={i} onClick={() => { setReviewPage(i); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${i === safePage ? 'bg-teal-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{i + 1}</button>
                                                 ))}
                                             </div>
                                         )}
@@ -923,23 +1419,62 @@
                             })()}
                         </div>
                     </main>
+                    {/* 意見回饋彈窗 */}
+                    {showFeedbackModal && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-700">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                        <Icons.Mail /> 意見回饋
+                                    </h2>
+                                    <button onClick={() => { setShowFeedbackModal(false); setFeedbackMsg(''); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-bold text-xl leading-none">
+                                        ✕
+                                    </button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">回饋類型</label>
+                                        <select value={feedbackType} onChange={(e) => setFeedbackType(e.target.value)} className="w-full p-3 border-2 border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-700 dark:text-white">
+                                            <option value="question_error">⚠️ 錯題回報 / 解析錯誤</option>
+                                            <option value="feature">✨ 新功能許願</option>
+                                            <option value="other">💬 其他建議</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">詳細內容</label>
+                                        <textarea value={feedbackContent} onChange={(e) => setFeedbackContent(e.target.value)} placeholder="請描述您遇到的問題或希望新增的功能..." rows="5" className="w-full p-3 border-2 border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:border-teal-500 bg-white dark:bg-slate-700 text-slate-700 dark:text-white resize-none"></textarea>
+                                    </div>
+
+                                    {feedbackMsg && (
+                                        <div className={`p-3 rounded-xl text-sm font-bold text-center animate-fade-in ${feedbackMsg.includes('送出') ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                                            {feedbackMsg}
+                                        </div>
+                                    )}
+
+                                    <div className="flex gap-3 justify-end mt-6 pt-2 border-t border-slate-100 dark:border-slate-700">
+                                        <button onClick={() => { setShowFeedbackModal(false); setFeedbackMsg(''); }} className="px-5 py-2.5 rounded-xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 transition-colors">取消</button>
+                                        <button onClick={handleFeedbackSubmit} disabled={isSubmittingFeedback} className="px-5 py-2.5 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-700 transition-colors disabled:opacity-50 flex items-center gap-2">
+                                            {isSubmittingFeedback ? <Icons.Loader2 className="w-4 h-4" /> : '送出回饋'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
 
-        // ==========================================
-        // 🌗 深色模式工具
-        // ==========================================
         const THEME_KEY = 'medtutor_theme';
         const getInitialTheme = () => {
-            try { const saved = localStorage.getItem(THEME_KEY); if (saved) return saved; } catch {}
+            try { const saved = localStorage.getItem(THEME_KEY); if (saved) return saved; } catch { }
             return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         };
         const applyTheme = (theme) => {
             document.documentElement.classList.toggle('dark', theme === 'dark');
-            try { localStorage.setItem(THEME_KEY, theme); } catch {}
+            try { localStorage.setItem(THEME_KEY, theme); } catch { }
         };
-        // 啟動時立即套用（避免閃白畫面）
         applyTheme(getInitialTheme());
 
         const ThemeToggle = ({ isDark, onToggle }) => (
@@ -948,9 +1483,6 @@
             </button>
         );
 
-        // ==========================================
-        // 🚀 App Root（認證包裝器）
-        // ==========================================
         function App() {
             const [session, setSession] = React.useState(null);
             const [loading, setLoading] = React.useState(true);
@@ -968,9 +1500,9 @@
                 return () => subscription.unsubscribe();
             }, []);
 
-            const handleLogout = async () => { try { localStorage.removeItem('medtutor_login_time'); } catch {} await supabase.auth.signOut(); setSession(null); };
+            const handleLogout = async () => { await supabase.auth.signOut(); setSession(null); };
 
-            if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-900"><Icons.Loader2 className="w-10 h-10 text-teal-500"/></div>;
+            if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-900"><Icons.Loader2 className="w-10 h-10 text-teal-500" /></div>;
             if (!session) return <LoginScreen onLogin={setSession} isDark={isDark} toggleTheme={toggleTheme} />;
             return <MainApp session={session} onLogout={handleLogout} isDark={isDark} toggleTheme={toggleTheme} />;
         }
@@ -979,4 +1511,5 @@
         root.render(<App />);
     </script>
 </body>
+
 </html>
