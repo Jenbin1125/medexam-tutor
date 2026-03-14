@@ -18,7 +18,7 @@
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./knowledge_graph_data.js"></script>
-
+    <script src="./config.js"></script> <script type="text/babel"></script>
     <style>
         /* ── 色彩系統：CSS 自訂屬性 ── */
         :root {
@@ -619,8 +619,9 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const SUPABASE_URL = 'https://mydityyenvjktldmvqui.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15ZGl0eXllbnZqa3RsZG12cXVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NTAyODEsImV4cCI6MjA4NzMyNjI4MX0.-LyWO1em4ZHPcE_jYAxegzBjhtgJ82E1VOi7ZRKRrYg';
+        // 改從 window.ENV 讀取變數
+        const SUPABASE_URL = window.ENV.SUPABASE_URL;
+        const SUPABASE_ANON_KEY = window.ENV.SUPABASE_ANON_KEY;
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const knowledgeGraphData = window.knowledgeGraphData || [];
         const SUPABASE_STORAGE_BUCKET = 'exam_images';
