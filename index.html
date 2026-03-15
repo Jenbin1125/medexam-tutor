@@ -18,7 +18,8 @@
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./knowledge_graph_data.js"></script>
-
+    <script src="./config.js"></script>
+    <script type="text/babel"></script>
     <style>
         /* ── 色彩系統：CSS 自訂屬性 ── */
         :root {
@@ -269,18 +270,73 @@
         }
 
         /* ── 導覽列數字選題按鈕 ── */
-        .jump-bar { background: white; border: 1px solid #e2e8f0; }
-        .jump-btn-default { background: white; color: #475569; border: 2px solid #e2e8f0; }
-        .jump-btn-default:hover { border-color: #0d9488; color: #0d9488; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(13,148,136,0.15); }
-        .jump-btn-correct { background: #10b981; color: white; border: 2px solid #059669; }
-        .jump-btn-incorrect { background: #ef4444; color: white; border: 2px solid #dc2626; }
-        .jump-btn-viewed { background: #f59e0b; color: white; border: 2px solid #d97706; }
-        html.dark .jump-bar { background: #0f172a; border-color: #2d3a50; }
-        html.dark .jump-btn-default { background: transparent; color: rgba(196,210,230,0.7); border-color: #334155; }
-        html.dark .jump-btn-default:hover { border-color: #38bdf8; color: #38bdf8; box-shadow: 0 4px 12px rgba(56,189,248,0.15); }
-        html.dark .jump-btn-correct { background: #065f46; border-color: #10b981; }
-        html.dark .jump-btn-incorrect { background: #7f1d1d; border-color: #ef4444; }
-        html.dark .jump-btn-viewed { background: #78350f; border-color: #f59e0b; }
+        .jump-bar {
+            background: white;
+            border: 1px solid #e2e8f0;
+        }
+
+        .jump-btn-default {
+            background: white;
+            color: #475569;
+            border: 2px solid #e2e8f0;
+        }
+
+        .jump-btn-default:hover {
+            border-color: #0d9488;
+            color: #0d9488;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(13, 148, 136, 0.15);
+        }
+
+        .jump-btn-correct {
+            background: #10b981;
+            color: white;
+            border: 2px solid #059669;
+        }
+
+        .jump-btn-incorrect {
+            background: #ef4444;
+            color: white;
+            border: 2px solid #dc2626;
+        }
+
+        .jump-btn-viewed {
+            background: #f59e0b;
+            color: white;
+            border: 2px solid #d97706;
+        }
+
+        html.dark .jump-bar {
+            background: #0f172a;
+            border-color: #2d3a50;
+        }
+
+        html.dark .jump-btn-default {
+            background: transparent;
+            color: rgba(196, 210, 230, 0.7);
+            border-color: #334155;
+        }
+
+        html.dark .jump-btn-default:hover {
+            border-color: #38bdf8;
+            color: #38bdf8;
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
+        }
+
+        html.dark .jump-btn-correct {
+            background: #065f46;
+            border-color: #10b981;
+        }
+
+        html.dark .jump-btn-incorrect {
+            background: #7f1d1d;
+            border-color: #ef4444;
+        }
+
+        html.dark .jump-btn-viewed {
+            background: #78350f;
+            border-color: #f59e0b;
+        }
 
         /* ── 重置測驗按鈕 ── */
         .btn-reset {
@@ -299,31 +355,36 @@
             cursor: pointer;
             transition: color 0.2s, border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s;
         }
+
         .btn-reset:hover {
             color: #dc2626;
             border-color: #fca5a5;
             background: #fff5f5;
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(220,38,38,0.12);
+            box-shadow: 0 4px 8px rgba(220, 38, 38, 0.12);
         }
+
         .btn-reset:hover .btn-reset-icon {
             transform: rotate(-45deg);
         }
+
         .btn-reset-icon {
             transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
             display: flex;
             align-items: center;
         }
+
         html.dark .btn-reset {
             background: transparent;
-            color: rgba(196,210,230,0.6);
+            color: rgba(196, 210, 230, 0.6);
             border-color: #334155;
         }
+
         html.dark .btn-reset:hover {
             color: #fca5a5;
             border-color: #ef4444;
-            background: rgba(239,68,68,0.08);
-            box-shadow: 0 4px 12px rgba(239,68,68,0.15);
+            background: rgba(239, 68, 68, 0.08);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
         }
 
         /* ── 題目左側題號圓形徽章：淺色模式白底灰框 ── */
@@ -691,9 +752,10 @@
             Mail: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>,
             Shield: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>,
             Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>,
-            RotateCcw: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>,
+            RotateCcw: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>,
             Moon: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" /></svg>,
             Sun: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" /></svg>,
+            Google: () => <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>,
         };
 
         const MarkdownViewer = ({ content }) => {
@@ -798,8 +860,21 @@
                 if (!trimmed) { setError('請輸入 Email'); return; }
                 setStep('sending');
                 try {
-                    const { data: allowed } = await supabase.from('allowed_emails').select('email').eq('email', trimmed).maybeSingle();
-                    if (!allowed) { setError('此 Email 不在允許名單中，請聯繫管理員。'); setStep('email'); return; }
+                    // 取得白名單資料，包含到期日
+                    const { data: allowed } = await supabase.from('allowed_emails').select('email, expires_at').eq('email', trimmed).maybeSingle();
+
+                    if (!allowed) {
+                        setError('此 Email 不在允許名單中，請聯繫管理員。');
+                        setStep('email');
+                        return;
+                    }
+
+                    // 檢查是否過期 (如果有設定 expires_at 的話)
+                    if (allowed.expires_at && new Date(allowed.expires_at) < new Date()) {
+                        setError('此帳號的存取權限已到期。如需展延，請聯繫管理員。');
+                        setStep('email');
+                        return;
+                    }
                     const { error: otpErr } = await supabase.auth.signInWithOtp({ email: trimmed, options: { shouldCreateUser: true } });
                     if (otpErr) throw otpErr;
                     setStep('otp'); setCountdown(60);
@@ -814,6 +889,23 @@
                     if (verifyErr) throw verifyErr;
                     onLogin(data.session);
                 } catch (e) { setError(e.message || '驗證失敗，請重試'); }
+            };
+
+            // --- 新增：處理 Google 一鍵登入 ---
+            const handleGoogleLogin = async () => {
+                setError('');
+                try {
+                    const { error } = await supabase.auth.signInWithOAuth({
+                        provider: 'google',
+                        options: {
+                            // 登入成功後導回目前的網址
+                            redirectTo: window.location.origin
+                        }
+                    });
+                    if (error) throw error;
+                } catch (e) {
+                    setError(e.message || 'Google 登入失敗，請重試');
+                }
             };
 
             return (
@@ -835,6 +927,24 @@
                                     </div>
                                 </div>
                                 <button onClick={handleSendOtp} className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition-colors shadow-md">發送驗證碼</button>
+
+                                {/* ✨ 新增：分隔線與 Google 登入按鈕 */}
+                                <div className="relative my-6">
+                                    <div className="absolute inset-0 flex items-center">
+                                        <div className="w-full border-t border-slate-200"></div>
+                                    </div>
+                                    <div className="relative flex justify-center text-sm">
+                                        <span className="px-3 bg-white text-slate-400 font-bold">或已綁定帳號者</span>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleGoogleLogin}
+                                    className="w-full py-3 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-xl transition-colors shadow-sm border-2 border-slate-200 flex items-center justify-center gap-2"
+                                >
+                                    <Icons.Google />
+                                    使用 Google 帳號登入
+                                </button>
                             </div>
                         )}
                         {step === 'sending' && (
@@ -867,6 +977,32 @@
         // ==========================================
         function MainApp({ session, onLogout, isDark, toggleTheme }) {
             const userId = session?.user?.id;
+            // 檢查是否已綁定 Google
+            const [isGoogleLinked, setIsGoogleLinked] = React.useState(false);
+
+            React.useEffect(() => {
+                if (session?.user?.identities) {
+                    const hasGoogle = session.user.identities.some(id => id.provider === 'google');
+                    setIsGoogleLinked(hasGoogle);
+                }
+            }, [session]);
+
+            // 執行綁定 Google
+            const handleLinkGoogle = async () => {
+                try {
+                    const { error } = await supabase.auth.linkIdentity({
+                        provider: 'google',
+                        options: {
+                            redirectTo: window.location.origin
+                        }
+                    });
+
+                    if (error) throw error;
+                    alert('系統將引導您前往 Google 進行授權...');
+                } catch (e) {
+                    alert('綁定失敗：' + (e.message || '未知錯誤'));
+                }
+            };
 
             // 1. 記憶狀態與防呆解析
             const [activeTab, setActiveTab] = React.useState(() => {
@@ -993,6 +1129,41 @@
                 return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
             }, [completedKeywords, userId]);
 
+            React.useEffect(() => {
+                if (!userId) return;
+
+                // 為當前視窗/分頁生成唯一的 Session ID
+                const currentSessionId = crypto.randomUUID();
+
+                // 建立專屬該使用者的私有頻道
+                const channel = supabase.channel(`account_activity_${userId}`);
+
+                // 監聽來自其他視窗的登入廣播
+                channel.on('broadcast', { event: 'new_login' }, async (payload) => {
+                    if (payload.sessionId !== currentSessionId) {
+                        // 收到其他視窗的登入通知，強制登出當前視窗
+                        alert('⚠️ 偵測到您的帳號已在其他裝置或分頁登入。\n為確保測驗進度安全，本頁面將強制登出。');
+                        await onLogout();
+                    }
+                });
+
+                // 訂閱頻道並在成功後發送自己的登入廣播
+                channel.subscribe(async (status) => {
+                    if (status === 'SUBSCRIBED') {
+                        await channel.send({
+                            type: 'broadcast',
+                            event: 'new_login',
+                            sessionId: currentSessionId
+                        });
+                    }
+                });
+
+                // 元件卸載時清理頻道
+                return () => {
+                    supabase.removeChannel(channel);
+                };
+            }, [userId, onLogout]);
+
             const toggleStar = async (uid) => {
                 const isStarred = starredUids.has(uid);
                 const next = new Set(starredUids);
@@ -1016,14 +1187,48 @@
             };
             React.useEffect(() => { if (activeTab === 'review') loadStarredQuestions(); }, [activeTab, starredUids]);
 
-            const loadAdminEmails = async () => { const { data } = await supabase.from('allowed_emails').select('*').order('created_at', { ascending: false }); setAdminEmails(data || []); };
+            // ── 1. 改用我們剛寫好的 RPC 函數撈取進階資料 ──
+            const loadAdminEmails = async () => {
+                const { data, error } = await supabase.rpc('get_admin_user_stats');
+                if (!error) setAdminEmails(data || []);
+            };
+
+            // ✨ 優化後的 addEmail (加入錯誤捕捉)
             const addEmail = async () => {
                 const e = newEmail.trim().toLowerCase();
                 if (!e) return;
-                await supabase.from('allowed_emails').insert({ email: e });
-                setNewEmail(''); loadAdminEmails();
+                const { error } = await supabase.from('allowed_emails').insert({ email: e, created_by: userId });
+
+                if (error) {
+                    // 如果錯誤代碼是 23505 代表違反唯一性 (Unique violation)
+                    if (error.code === '23505') alert(`新增失敗：${e} 已經在名單中了！`);
+                    else alert('新增失敗：' + error.message);
+                    return;
+                }
+
+                setNewEmail('');
+                loadAdminEmails();
             };
-            const removeEmail = async (id) => { await supabase.from('allowed_emails').delete().eq('id', id); loadAdminEmails(); };
+
+            // ── 3. 刪除 Email ──
+            const removeEmail = async (id) => {
+                await supabase.from('allowed_emails').delete().eq('id', id);
+                loadAdminEmails();
+            };
+
+            // ── 4. 更新 Email 到期日 ──
+            const updateExpireDate = async (id, newDateStr) => {
+                // 若有選日期，設定為該日的 23:59:59 (台灣時間)；若清空，則設為 null (永久有效)
+                const val = newDateStr ? `${newDateStr} 23:59:59+08` : null;
+                const { error } = await supabase.from('allowed_emails').update({ expires_at: val }).eq('id', id);
+
+                if (error) {
+                    alert('更新到期日失敗：' + error.message);
+                } else {
+                    loadAdminEmails(); // 重新載入以更新狀態燈號
+                }
+            };
+
             React.useEffect(() => { if (showAdmin) loadAdminEmails(); }, [showAdmin]);
 
             const getProgress = React.useCallback((nodeId) => {
@@ -1223,10 +1428,13 @@
                                     ))}
                                 </div>
 
-                                {/* 意見回饋按鈕 */}
-                                <button onClick={() => setShowFeedbackModal(true)} className="text-xs text-slate-300 hover:text-teal-400 flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-slate-800 transition-colors hidden sm:flex border border-slate-700">
+                                {/* 意見回饋按鈕 (純圖示浮動版) */}
+                                <button
+                                    onClick={() => setShowFeedbackModal(true)}
+                                    className="text-slate-300 hover:text-teal-400 p-1.5 rounded-lg hover:bg-slate-800 transition-all duration-200 hover:-translate-y-0.5 hover:scale-110 hidden sm:flex border border-slate-700 shadow-sm"
+                                    title="意見回饋 (回報問題或功能許願)"
+                                >
                                     <span className="w-4 h-4 flex items-center justify-center"><Icons.Mail /></span>
-                                    <span>意見回饋</span>
                                 </button>
 
                                 {/* 管理員按鈕 */}
@@ -1234,6 +1442,26 @@
 
                                 {/* 使用者 Email */}
                                 <span className="text-[10px] text-slate-500 hidden lg:block ml-2">{session?.user?.email}</span>
+
+                                {/* Google 帳號綁定狀態 (精簡圖示版) */}
+                                {!isGoogleLinked ? (
+                                    <button
+                                        onClick={handleLinkGoogle}
+                                        className="text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 border border-amber-200 shadow-sm whitespace-nowrap"
+                                        title="預防醫院信箱失效，請點擊綁定 Google 帳號"
+                                    >
+                                        <Icons.Google />
+                                        <span className="font-bold">未綁定</span>
+                                    </button>
+                                ) : (
+                                    <div
+                                        className="text-xs bg-slate-800 text-slate-300 px-2 py-1.5 rounded-lg flex items-center gap-1.5 border border-slate-700 cursor-default whitespace-nowrap"
+                                        title="已安全綁定 Google 帳號"
+                                    >
+                                        <Icons.Google />
+                                        <Icons.Check className="w-3.5 h-3.5 text-teal-400 -ml-0.5" />
+                                    </div>
+                                )}
 
                                 {/* 淺/深色模式切換 */}
                                 <div className="ml-1">
@@ -1243,10 +1471,13 @@
                                 {/* 分隔線 */}
                                 <div className="w-px h-5 bg-slate-700 mx-1"></div>
 
-                                {/* 登出按鈕 */}
-                                <button onClick={onLogout} className="text-xs text-slate-400 hover:text-red-400 flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-slate-800 transition-colors" title="登出">
+                                {/* 登出按鈕 (純圖示旋轉特效版) */}
+                                <button
+                                    onClick={onLogout}
+                                    className="text-slate-400 hover:text-red-400 p-2 rounded-lg hover:bg-slate-800 transition-all duration-200 hover:scale-110 hover:rotate-3"
+                                    title="登出系統"
+                                >
                                     <Icons.LogOut />
-                                    <span className="hidden sm:inline">登出</span>
                                 </button>
                             </div>
                         </div>
@@ -1260,13 +1491,53 @@
                                     <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && addEmail()} placeholder="new@hospital.org.tw" className="flex-1 px-4 py-2 border-2 border-amber-200 rounded-xl focus:outline-none focus:border-amber-400 text-sm" />
                                     <button onClick={addEmail} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-sm">新增</button>
                                 </div>
-                                <div className="space-y-2 max-h-60 overflow-y-auto">
-                                    {adminEmails.map(ae => (
-                                        <div key={ae.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-amber-100">
-                                            <span className="text-sm text-slate-700 font-mono">{ae.email}</span>
-                                            <button onClick={() => removeEmail(ae.id)} className="text-red-400 hover:text-red-600 p-1"><Icons.Trash /></button>
-                                        </div>
-                                    ))}
+                                <div className="max-h-80 overflow-y-auto border border-amber-200 rounded-xl bg-white shadow-inner pb-20">
+                                    <table className="w-full text-left text-sm whitespace-nowrap">
+                                        <thead className="sticky top-0 bg-amber-50 shadow-sm z-10">
+                                            <tr className="text-amber-800">
+                                                <th className="px-4 py-3 font-bold border-b border-amber-200">醫院 Email</th>
+                                                <th className="px-4 py-3 font-bold text-center border-b border-amber-200">帳號狀態</th>
+                                                <th className="px-4 py-3 font-bold text-center border-b border-amber-200">Google 綁定</th>
+                                                <th className="px-4 py-3 font-bold border-b border-amber-200">到期日 (可修改)</th>
+                                                <th className="px-4 py-3 font-bold border-b border-amber-200">最後上線時間</th>
+                                                <th className="px-4 py-3 font-bold text-center border-b border-amber-200">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-amber-100">
+                                            {adminEmails.map(ae => {
+                                                const isExpired = ae.expires_at && new Date(ae.expires_at) < new Date();
+                                                const isForever = !ae.expires_at;
+                                                return (
+                                                    <tr key={ae.id} className="hover:bg-amber-50/50 transition-colors">
+                                                        <td className="px-4 py-3 font-mono text-slate-700">{ae.email}</td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            {isForever ? <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded-md font-bold border border-blue-200">永久有效</span> :
+                                                                isExpired ? <span className="text-[10px] bg-red-100 text-red-700 px-2 py-1 rounded-md font-bold border border-red-200">已過期</span> :
+                                                                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded-md font-bold border border-green-200">使用中</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            {ae.is_google_linked ? <span className="text-[10px] bg-teal-100 text-teal-700 px-2 py-1 rounded-md font-bold border border-teal-200">已綁定</span> : <span className="text-slate-300">-</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <input
+                                                                type="date"
+                                                                defaultValue={ae.expires_at ? new Date(ae.expires_at).toLocaleDateString('en-CA') : ''}
+                                                                onChange={(e) => updateExpireDate(ae.id, e.target.value)}
+                                                                className="px-2 py-1 text-xs font-mono border border-slate-200 rounded-md text-slate-700 bg-slate-50 hover:bg-white focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-colors cursor-pointer"
+                                                                title="選擇日期以更改，點擊 [清除] 或清空則設為永久有效"
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3 text-slate-500 text-xs font-mono">
+                                                            {ae.last_online ? new Date(ae.last_online).toLocaleString('zh-TW', { hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '尚未登入'}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <button onClick={() => { if (window.confirm(`確定要移除 ${ae.email} 的存取權限嗎？`)) removeEmail(ae.id) }} className="text-slate-400 hover:text-red-500 p-1.5 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-red-200 transition-all"><Icons.Trash /></button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
