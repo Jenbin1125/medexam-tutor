@@ -19,7 +19,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./knowledge_graph_data.js"></script>
     <script src="./config.js"></script>
-    <script type="text/babel"></script>
     <style>
         /* ── 色彩系統：CSS 自訂屬性 ── */
         :root {
@@ -306,6 +305,12 @@
             border: 2px solid #d97706;
         }
 
+        .jump-btn-blind {
+            background: #6366f1;
+            color: white;
+            border: 2px solid #4f46e5;
+        }
+
         html.dark .jump-bar {
             background: #0f172a;
             border-color: #2d3a50;
@@ -336,6 +341,11 @@
         html.dark .jump-btn-viewed {
             background: #78350f;
             border-color: #f59e0b;
+        }
+
+        html.dark .jump-btn-blind {
+            background: #312e81;
+            border-color: #6366f1;
         }
 
         /* ── 重置測驗按鈕 ── */
@@ -605,78 +615,40 @@
         .theme-toggle:hover {
             transform: rotate(30deg);
         }
-
-        .jump-bar {
-            background: white;
-            border: 1px solid #e2e8f0;
-        }
-
-        .jump-btn-default {
-            background: white;
-            color: #475569;
-            border: 2px solid #e2e8f0;
-        }
-
-        .jump-btn-default:hover {
-            border-color: #0d9488;
-            color: #0d9488;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(13, 148, 136, 0.15);
-        }
-
-        .jump-btn-correct {
-            background: #10b981;
-            color: white;
-            border: 2px solid #059669;
-        }
-
-        .jump-btn-incorrect {
-            background: #ef4444;
-            color: white;
-            border: 2px solid #dc2626;
-        }
-
-        .jump-btn-viewed {
-            background: #f59e0b;
-            color: white;
-            border: 2px solid #d97706;
-        }
-
-        html.dark .jump-bar {
-            background: #0f172a;
-            border-color: #2d3a50;
-        }
-
-        html.dark .jump-btn-default {
-            background: transparent;
-            color: rgba(196, 210, 230, 0.7);
-            border-color: #334155;
-        }
-
-        html.dark .jump-btn-default:hover {
-            border-color: #38bdf8;
-            color: #38bdf8;
-            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.15);
-        }
-
-        html.dark .jump-btn-correct {
-            background: #065f46;
-            border-color: #10b981;
-        }
-
-        html.dark .jump-btn-incorrect {
-            background: #7f1d1d;
-            border-color: #ef4444;
-        }
-
-        html.dark .jump-btn-viewed {
-            background: #78350f;
-            border-color: #f59e0b;
-        }
     </style>
 </head>
 
 <body>
+    <!-- 載入中畫面 -->
+    <div id="loading-splash" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#0f172a;flex-direction:column;gap:16px;">
+        <div id="splash-spinner" style="width:48px;height:48px;border:3px solid #1e293b;border-top-color:#14b8a6;border-radius:50%;animation:sp .8s linear infinite;"></div>
+        <div id="splash-text" style="color:#64748b;font-size:14px;font-family:system-ui,sans-serif;">系統載入中...</div>
+        <div id="splash-error" style="display:none;color:#fca5a5;font-size:12px;font-family:monospace;max-width:480px;text-align:center;padding:12px;background:rgba(239,68,68,0.1);border-radius:8px;margin-top:8px;"></div>
+        <button id="splash-retry" onclick="window.location.reload()" style="display:none;margin-top:8px;padding:8px 24px;background:#14b8a6;color:white;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;">重新整理</button>
+        <style>@keyframes sp{to{transform:rotate(360deg)}}</style>
+    </div>
+    <script>
+        // 保險機制：15 秒後若 splash 還在，表示 JS 執行失敗
+        window.__splashTimer = setTimeout(function() {
+            var el = document.getElementById('loading-splash');
+            if (el) {
+                document.getElementById('splash-spinner').style.display = 'none';
+                document.getElementById('splash-text').textContent = '載入逾時，可能是網路問題或程式錯誤';
+                document.getElementById('splash-text').style.color = '#fca5a5';
+                document.getElementById('splash-retry').style.display = 'block';
+                if (window.__splashErr) {
+                    document.getElementById('splash-error').style.display = 'block';
+                    document.getElementById('splash-error').textContent = window.__splashErr;
+                }
+            }
+        }, 15000);
+        // 全域錯誤捕捉
+        window.onerror = function(msg, src, line) {
+            window.__splashErr = msg + ' (line ' + line + ')';
+            var errEl = document.getElementById('splash-error');
+            if (errEl) { errEl.style.display = 'block'; errEl.textContent = window.__splashErr; }
+        };
+    </script>
     <div id="root"></div>
 
     <script type="text/babel">
@@ -1265,7 +1237,19 @@
                 fetchDB();
             }, [selectedContext.keyword]);
 
-            const handleAnswer = (uid, opt, ans) => setQStates(p => ({ ...p, [uid]: { ...p[uid], answerSelected: opt, status: ans.includes(opt) ? 'correct' : 'incorrect' } }));
+            // ── 答題流程：選答案 → 信心評估 → 揭曉結果 ──
+            const handleAnswer = (uid, opt, ans) => {
+                // Phase 1: 記錄選擇，進入「等待信心評估」狀態
+                setQStates(p => ({ ...p, [uid]: { ...p[uid], answerSelected: opt, pendingConfidence: true, _correctAns: ans } }));
+            };
+            const handleConfidence = (uid, confident) => {
+                // Phase 2: 記錄信心，揭曉對錯
+                setQStates(p => {
+                    const prev = p[uid];
+                    const isCorrect = prev._correctAns?.includes(prev.answerSelected);
+                    return { ...p, [uid]: { ...prev, pendingConfidence: false, confidence: confident ? 'sure' : 'guess', status: isCorrect ? 'correct' : 'incorrect', answeredAt: Date.now() } };
+                });
+            };
             const handleShowAI = (uid) => setQStates(p => ({ ...p, [uid]: { ...p[uid], status: p[uid].status === 'unanswered' ? 'viewed' : p[uid].status, showExpl: true } }));
             const toggleKw = (kwId) => setCompletedKeywords(p => { const n = new Set(p); n.has(kwId) ? n.delete(kwId) : n.add(kwId); return n; });
             const scrollToQ = (uid) => document.getElementById(`q-${uid}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1288,7 +1272,9 @@
                                 answerSelected: null,
                                 status: 'unanswered',
                                 openStates: [true, false, false],
-                                showExpl: false
+                                showExpl: false,
+                                confidence: null,
+                                pendingConfidence: false
                             };
                         });
                         return reset;
@@ -1359,7 +1345,12 @@
                                         const optImg = q[`img_${opt.toLowerCase()}`];
                                         if (!optText && !optImg) return null;
                                         let bs = "bg-white border-2 border-slate-200 text-slate-700 hover:border-teal-400 hover:bg-teal-50";
-                                        if (st.answerSelected) {
+                                        if (st.answerSelected && st.pendingConfidence) {
+                                            // 信心評估階段：只標記選中項，不揭曉對錯
+                                            if (opt === st.answerSelected) bs = "bg-teal-50 border-2 border-teal-400 text-teal-800 font-bold";
+                                            else bs = "bg-slate-50 border-2 border-slate-100 text-slate-400 opacity-50";
+                                        } else if (st.answerSelected && !st.pendingConfidence) {
+                                            // 已揭曉：顯示對錯
                                             if (officialAns.includes(opt)) bs = "bg-green-100 border-2 border-green-500 text-green-800 font-bold";
                                             else if (opt === st.answerSelected) bs = "bg-red-50 border-2 border-red-400 text-red-700";
                                             else bs = "bg-slate-50 border-2 border-slate-100 text-slate-400 opacity-50";
@@ -1376,10 +1367,29 @@
                                     </div>
                                 )}
 
-                                {st.answerSelected && !st.showExpl && (
-                                    <div className="flex items-center gap-4 mb-4 animate-fade-in">
+                                {/* ── 信心評估提示（選完答案後、揭曉前） ── */}
+                                {st.answerSelected && st.pendingConfidence && (
+                                    <div className="flex flex-col items-center gap-3 py-4 animate-fade-in">
+                                        <p className="text-slate-600 font-bold text-sm">你對這個答案有多少信心？</p>
+                                        <div className="flex gap-3">
+                                            <button onClick={() => handleConfidence(q.uid, true)} className="px-5 py-2.5 rounded-xl font-bold text-sm border-2 border-teal-400 text-teal-700 bg-teal-50 hover:bg-teal-100 transition-all">💪 我很確定</button>
+                                            <button onClick={() => handleConfidence(q.uid, false)} className="px-5 py-2.5 rounded-xl font-bold text-sm border-2 border-slate-300 text-slate-500 bg-slate-50 hover:bg-slate-100 transition-all">🤔 我在猜</button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ── 答題結果 + 四象限標籤 ── */}
+                                {st.answerSelected && !st.pendingConfidence && !st.showExpl && (
+                                    <div className="flex items-center gap-3 mb-4 animate-fade-in flex-wrap">
                                         {st.status === 'correct' ? <span className="text-green-600 font-bold text-lg flex items-center gap-1"><Icons.Check className="w-5 h-5" />答對了！</span> : <span className="text-red-500 font-bold text-lg">答錯囉，正確答案是 {officialAns}</span>}
-                                        <button onClick={() => handleShowAI(q.uid)} className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-teal-600 text-white font-semibold rounded-xl transition-all shadow-sm"><Icons.Brain /> 觀看 AI 導師解析</button>
+                                        {st.confidence && (() => {
+                                            const quad = st.status === 'correct' && st.confidence === 'sure' ? { label: '真懂', cls: 'bg-emerald-100 text-emerald-700 border-emerald-300' }
+                                                : st.status === 'correct' && st.confidence === 'guess' ? { label: '運氣', cls: 'bg-amber-100 text-amber-700 border-amber-300' }
+                                                : st.status === 'incorrect' && st.confidence === 'sure' ? { label: '危險迷思', cls: 'bg-red-100 text-red-700 border-red-300' }
+                                                : { label: '知識空白', cls: 'bg-indigo-100 text-indigo-700 border-indigo-300' };
+                                            return <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${quad.cls}`}>{quad.label}</span>;
+                                        })()}
+                                        <button onClick={() => handleShowAI(q.uid)} className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-teal-600 text-white font-semibold rounded-xl transition-all shadow-sm ml-auto"><Icons.Brain /> 觀看 AI 導師解析</button>
                                     </div>
                                 )}
                                 {!st.answerSelected && !st.showExpl && <button onClick={() => handleShowAI(q.uid)} className="text-slate-400 hover:text-teal-600 text-sm font-bold underline transition-colors">跳過作答，直接看詳解</button>}
@@ -1608,18 +1618,18 @@
                                             <div className="jump-bar px-3 py-2 rounded-xl mb-4 sticky top-[48px] z-10 flex items-start justify-between gap-4 shadow-sm backdrop-blur-sm">
                                                 <div className="flex flex-wrap gap-1.5 flex-1">
                                                     {selectedQuestions.map((q, idx) => {
-                                                        const s = qStates[q.uid]?.status || 'unanswered';
-                                                        // 預設樣式：淺色模式白底灰框，深色模式深色底
-                                                        // 狀態對應 jump-btn-* class（與 index_記憶.html 一致）
+                                                        const st = qStates[q.uid] || {};
+                                                        const s = st.status || 'unanswered';
+                                                        const c = st.confidence;
+                                                        // 四象限色彩：真懂=綠、運氣=橙、危險迷思=紅、知識空白=紫、未答=灰
                                                         let bc = "jump-btn-default";
-
-                                                        if (s === 'correct') {
-                                                            bc = "jump-btn-correct";
-                                                        } else if (s === 'incorrect') {
-                                                            bc = "jump-btn-incorrect";
-                                                        } else if (s === 'viewed') {
-                                                            bc = "jump-btn-viewed";
-                                                        }
+                                                        if (s === 'correct' && c === 'sure') bc = "jump-btn-correct";
+                                                        else if (s === 'correct' && c === 'guess') bc = "jump-btn-viewed";
+                                                        else if (s === 'incorrect' && c === 'sure') bc = "jump-btn-incorrect";
+                                                        else if (s === 'incorrect' && c === 'guess') bc = "jump-btn-blind";
+                                                        else if (s === 'correct') bc = "jump-btn-correct";
+                                                        else if (s === 'incorrect') bc = "jump-btn-incorrect";
+                                                        else if (s === 'viewed') bc = "jump-btn-viewed";
 
                                                         return (
                                                             <button
@@ -1766,7 +1776,11 @@
                 applyTheme(next ? 'dark' : 'light');
             };
 
+            // 移除載入畫面 + 初始化 session
             React.useEffect(() => {
+                const splash = document.getElementById('loading-splash');
+                if (splash) splash.remove();
+                if (window.__splashTimer) clearTimeout(window.__splashTimer);
                 supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); setLoading(false); });
                 const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => { setSession(session); });
                 return () => subscription.unsubscribe();
@@ -1779,8 +1793,40 @@
             return <MainApp session={session} onLogout={handleLogout} isDark={isDark} toggleTheme={toggleTheme} />;
         }
 
+        // ==========================================
+        // 🛡️ Error Boundary — 防止 JS 錯誤導致整頁白屏
+        // ==========================================
+        class ErrorBoundary extends React.Component {
+            constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+            static getDerivedStateFromError(error) { return { hasError: true, error }; }
+            componentDidCatch(error, errorInfo) {
+                console.error('[ErrorBoundary]', error, errorInfo);
+            }
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+                            <div className="bg-white rounded-2xl border border-slate-200 p-8 max-w-md w-full text-center">
+                                <div className="text-4xl mb-4">⚠️</div>
+                                <h2 className="text-xl font-bold text-slate-800 mb-2">系統發生非預期錯誤</h2>
+                                <p className="text-sm text-slate-500 mb-4">請嘗試重新整理頁面。若問題持續，請透過意見回饋告知管理員。</p>
+                                <details className="text-left mb-4">
+                                    <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-600">技術細節</summary>
+                                    <pre className="mt-2 text-[11px] text-red-500 bg-red-50 rounded-lg p-3 overflow-auto max-h-32 border border-red-100">{this.state.error?.toString()}</pre>
+                                </details>
+                                <button onClick={() => window.location.reload()} className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition-colors">
+                                    重新整理頁面
+                                </button>
+                            </div>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(<ErrorBoundary><App /></ErrorBoundary>);
     </script>
 </body>
 
