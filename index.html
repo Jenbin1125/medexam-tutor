@@ -660,13 +660,67 @@
         const SUPABASE_STORAGE_BUCKET = 'exam_images';
 
         // ==========================================
+        // 📅 每日一語 + 四象限配色
+        // ==========================================
+        const DAILY_QUOTES = [
+            { text: '治療有時，緩解經常，安慰永遠。', author: 'Edward Trudeau' },
+            { text: '觀察、觀察、再觀察。', author: 'William Osler' },
+            { text: '好的臨床醫師不是知道所有的答案，而是知道該問什麼問題。', author: '臨床推理原則' },
+            { text: '當你聽到蹄聲時，先想馬，不要先想斑馬。', author: 'Theodore Woodward' },
+            { text: '病人是最好的教科書。', author: 'William Osler' },
+            { text: '聽病人說話，他會告訴你診斷。', author: 'William Osler' },
+            { text: '你照顧的不是疾病，是帶著疾病的人。', author: '全人醫療理念' },
+            { text: '每一位病人都在教你成為更好的醫師。', author: '臨床教學格言' },
+            { text: '最重要的檢查工具是你的雙手和聽診器。', author: '理學檢查原則' },
+            { text: '不要治療數字，要治療病人。', author: '臨床決策原則' },
+            { text: '永遠先確認 ABC：Airway, Breathing, Circulation。', author: 'ACLS 原則' },
+            { text: '一個好的鑑別診斷，勝過十個不精確的檢查。', author: '診斷學原則' },
+            { text: '讀書時想著病人，看病人時想著讀過的書。', author: '臨床學習法則' },
+            { text: '今天努力的你，是未來某位病人最大的幸運。', author: '致每位考生' },
+            { text: '有時候，握住病人的手比開處方更重要。', author: '醫病關係' },
+            { text: '你不需要完美，你只需要持續進步。', author: '成長心態' },
+            { text: '每道考題都是未來臨床情境的預演。', author: '考試心理學' },
+            { text: '學會休息也是學習的一部分。', author: '考前心理調適' },
+            { text: '所有偉大的醫師都曾經是考生。', author: '致考前的你' },
+            { text: '做困難的事情，然後它就會變簡單。', author: '刻意練習原則' },
+            { text: '醫學不只是記憶，更是理解與應用。', author: '深度學習原則' },
+            { text: '信心不是來自於準備完美，而是來自於知道自己盡了全力。', author: '考前心態' },
+            { text: '醫學是一門不確定的科學，也是一門可能性的藝術。', author: 'William Osler' },
+            { text: '先學做人，再學做醫生。', author: '臨床教學格言' },
+            { text: '用藥如用兵，不可不慎。', author: '藥物治療格言' },
+            { text: '醫學的藝術在於：在不確定中做出最佳決定。', author: '循證醫學精神' },
+            { text: '最好的學習方式是教別人。', author: '費曼學習法' },
+            { text: '醫學的進步來自於對每一個異常的好奇。', author: '研究精神' },
+            { text: '急診不急在速度，急在判斷。', author: '急診醫學原則' },
+            { text: '內科看門道，外科看手藝，但兩者的根基都是基本功。', author: '臨床訓練原則' },
+        ];
+        const getTodayQuote = () => {
+            const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+            return DAILY_QUOTES[dayOfYear % DAILY_QUOTES.length];
+        };
+        const Q_LABELS = {
+            mastered: { label: '真懂', cls: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+            lucky: { label: '運氣', cls: 'bg-amber-100 text-amber-700 border-amber-300' },
+            myth: { label: '危險迷思', cls: 'bg-red-100 text-red-700 border-red-300' },
+            blank: { label: '知識空白', cls: 'bg-indigo-100 text-indigo-700 border-indigo-300' },
+        };
+        const getQuadrant = (status, confidence) => {
+            if (status === 'correct' && confidence === 'sure') return 'mastered';
+            if (status === 'correct' && confidence === 'guess') return 'lucky';
+            if (status === 'incorrect' && confidence === 'sure') return 'myth';
+            if (status === 'incorrect' && confidence === 'guess') return 'blank';
+            return null;
+        };
+
+        // ==========================================
         // 預建索引 (加入 Boolean 防呆過濾)
         // ==========================================
         const prebuiltIndex = (() => {
             const nodeKeywordIds = new Map();
             const uidToKeywords = new Map();
             const kwIdToUids = new Map();
-            const processKeyword = (kw, nodeIds) => {
+            const importantKwIds = new Set();
+            const processKeyword = (kw, nodeIds, catName) => {
                 nodeIds.filter(Boolean).forEach(nid => {
                     if (!nodeKeywordIds.has(nid)) nodeKeywordIds.set(nid, new Set());
                     nodeKeywordIds.get(nid).add(kw.id);
@@ -678,12 +732,15 @@
                         uidToKeywords.get(uid).add(kw.word);
                     });
                 }
+                if (catName && (catName.includes('重要') || catName.includes('熱門'))) {
+                    importantKwIds.add(kw.id);
+                }
             };
             knowledgeGraphData.forEach(dept => {
-                if (dept.isSubdivided) { (dept.children || []).forEach(sub => { (sub.categories || []).forEach(cat => { (cat.keywords || []).forEach(kw => processKeyword(kw, [dept.id, sub.id])); }); }); }
-                else { (dept.categories || []).forEach(cat => { (cat.keywords || []).forEach(kw => processKeyword(kw, [dept.id])); }); }
+                if (dept.isSubdivided) { (dept.children || []).forEach(sub => { (sub.categories || []).forEach(cat => { (cat.keywords || []).forEach(kw => processKeyword(kw, [dept.id, sub.id], cat.name)); }); }); }
+                else { (dept.categories || []).forEach(cat => { (cat.keywords || []).forEach(kw => processKeyword(kw, [dept.id], cat.name)); }); }
             });
-            return { nodeKeywordIds, uidToKeywords, kwIdToUids };
+            return { nodeKeywordIds, uidToKeywords, kwIdToUids, importantKwIds };
         })();
 
         // ==========================================
@@ -1016,6 +1073,21 @@
             const [isSubmittingFeedback, setIsSubmittingFeedback] = React.useState(false);
             const [feedbackMsg, setFeedbackMsg] = React.useState('');
 
+            // --- 進度儀表板 State ---
+            const [examDate, setExamDate] = React.useState(null);
+            const [dailyQuote] = React.useState(() => getTodayQuote());
+            const daysUntilExam = React.useMemo(() => {
+                if (!examDate) return null;
+                const diff = new Date(examDate).getTime() - Date.now();
+                return diff > 0 ? Math.ceil(diff / 86400000) : 0;
+            }, [examDate]);
+            const importantProgress = React.useMemo(() => {
+                const total = prebuiltIndex.importantKwIds.size;
+                let completed = 0;
+                prebuiltIndex.importantKwIds.forEach(id => { if (completedKeywords.has(id)) completed++; });
+                return { completed, total, pct: total > 0 ? Math.round((completed / total) * 100) : 0 };
+            }, [completedKeywords]);
+
             // --- 意見回饋提交邏輯 ---
             const handleFeedbackSubmit = async () => {
                 if (!feedbackContent.trim()) {
@@ -1088,6 +1160,12 @@
 
                     const { data: adm } = await supabase.from('admin_users').select('id').eq('user_id', userId).maybeSingle();
                     setIsAdmin(!!adm);
+
+                    // 載入國考日期
+                    try {
+                        const { data: cfg } = await supabase.from('system_config').select('value').eq('key', 'exam_date').maybeSingle();
+                        if (cfg?.value) setExamDate(cfg.value);
+                    } catch(e) { /* system_config 表尚未建立時不報錯 */ }
                 })();
             }, [userId]);
 
@@ -1239,11 +1317,9 @@
 
             // ── 答題流程：選答案 → 信心評估 → 揭曉結果 ──
             const handleAnswer = (uid, opt, ans) => {
-                // Phase 1: 記錄選擇，進入「等待信心評估」狀態
                 setQStates(p => ({ ...p, [uid]: { ...p[uid], answerSelected: opt, pendingConfidence: true, _correctAns: ans } }));
             };
             const handleConfidence = (uid, confident) => {
-                // Phase 2: 記錄信心，揭曉對錯
                 setQStates(p => {
                     const prev = p[uid];
                     const isCorrect = prev._correctAns?.includes(prev.answerSelected);
@@ -1346,11 +1422,9 @@
                                         if (!optText && !optImg) return null;
                                         let bs = "bg-white border-2 border-slate-200 text-slate-700 hover:border-teal-400 hover:bg-teal-50";
                                         if (st.answerSelected && st.pendingConfidence) {
-                                            // 信心評估階段：只標記選中項，不揭曉對錯
                                             if (opt === st.answerSelected) bs = "bg-teal-50 border-2 border-teal-400 text-teal-800 font-bold";
                                             else bs = "bg-slate-50 border-2 border-slate-100 text-slate-400 opacity-50";
                                         } else if (st.answerSelected && !st.pendingConfidence) {
-                                            // 已揭曉：顯示對錯
                                             if (officialAns.includes(opt)) bs = "bg-green-100 border-2 border-green-500 text-green-800 font-bold";
                                             else if (opt === st.answerSelected) bs = "bg-red-50 border-2 border-red-400 text-red-700";
                                             else bs = "bg-slate-50 border-2 border-slate-100 text-slate-400 opacity-50";
@@ -1367,7 +1441,7 @@
                                     </div>
                                 )}
 
-                                {/* ── 信心評估提示（選完答案後、揭曉前） ── */}
+                                {/* ── 信心評估提示 ── */}
                                 {st.answerSelected && st.pendingConfidence && (
                                     <div className="flex flex-col items-center gap-3 py-4 animate-fade-in">
                                         <p className="text-slate-600 font-bold text-sm">你對這個答案有多少信心？</p>
@@ -1383,11 +1457,9 @@
                                     <div className="flex items-center gap-3 mb-4 animate-fade-in flex-wrap">
                                         {st.status === 'correct' ? <span className="text-green-600 font-bold text-lg flex items-center gap-1"><Icons.Check className="w-5 h-5" />答對了！</span> : <span className="text-red-500 font-bold text-lg">答錯囉，正確答案是 {officialAns}</span>}
                                         {st.confidence && (() => {
-                                            const quad = st.status === 'correct' && st.confidence === 'sure' ? { label: '真懂', cls: 'bg-emerald-100 text-emerald-700 border-emerald-300' }
-                                                : st.status === 'correct' && st.confidence === 'guess' ? { label: '運氣', cls: 'bg-amber-100 text-amber-700 border-amber-300' }
-                                                : st.status === 'incorrect' && st.confidence === 'sure' ? { label: '危險迷思', cls: 'bg-red-100 text-red-700 border-red-300' }
-                                                : { label: '知識空白', cls: 'bg-indigo-100 text-indigo-700 border-indigo-300' };
-                                            return <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${quad.cls}`}>{quad.label}</span>;
+                                            const qk = getQuadrant(st.status, st.confidence);
+                                            const ql = qk ? Q_LABELS[qk] : null;
+                                            return ql ? <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${ql.cls}`}>{ql.label}</span> : null;
                                         })()}
                                         <button onClick={() => handleShowAI(q.uid)} className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-teal-600 text-white font-semibold rounded-xl transition-all shadow-sm ml-auto"><Icons.Brain /> 觀看 AI 導師解析</button>
                                     </div>
@@ -1431,7 +1503,7 @@
                             <div className="flex items-center gap-2">
                                 {/* 導覽頁籤 */}
                                 <div className="flex gap-1 mr-2 bg-slate-800 p-1 rounded-xl">
-                                    {[{ id: 'graph', label: '知識圖譜', icon: <Icons.Network /> }, { id: 'ai-explain', label: '導師解析', icon: <Icons.Brain /> }, { id: 'review', label: `考前複習 (${starredUids.size})`, icon: <Icons.BookOpen /> }].map(tab => (
+                                    {[{ id: 'graph', label: '知識圖譜', icon: <Icons.Network /> }, { id: 'ai-explain', label: '導師解析', icon: <Icons.Brain /> }, { id: 'review', label: `考前複習 (${starredUids.size})`, icon: <Icons.BookOpen /> }, { id: 'dashboard', label: '學習儀表板', icon: <Icons.Target /> }].map(tab => (
                                         <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 ${activeTab === tab.id ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}>
                                             <span className="w-4 h-4 flex items-center justify-center">{tab.icon}</span>
                                             <span className="hidden sm:inline">{tab.label}</span>
@@ -1492,10 +1564,38 @@
                                 </button>
                             </div>
                         </div>
+                        {/* Header 第二行：進度儀表板 + 每日一語 */}
+                        <div className="max-w-4xl mx-auto px-4 pb-2 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1 rounded-lg border border-slate-700/50 flex-shrink-0">
+                                    {daysUntilExam !== null && (<><span className="text-teal-400 font-black text-lg tabular-nums">{daysUntilExam}</span><span className="text-slate-500 text-[10px] font-bold">天</span><div className="w-px h-4 bg-slate-700"></div></>)}
+                                    <span className="text-slate-400 text-[11px] font-bold">{importantProgress.completed}<span className="text-slate-600">/{importantProgress.total}</span></span>
+                                    <span className="text-teal-400 text-[11px] font-bold">({importantProgress.pct}%)</span>
+                                </div>
+                                <p className="text-slate-500 text-[11px] truncate min-w-0 hidden sm:block italic">
+                                    「{dailyQuote.text}」<span className="text-slate-600 not-italic ml-1">— {dailyQuote.author}</span>
+                                </p>
+                            </div>
+                            <span className="text-[10px] text-slate-600 hidden xl:block flex-shrink-0 truncate max-w-[140px]">{session?.user?.email}</span>
+                        </div>
                     </header>
 
                     {showAdmin && isAdmin && (
-                        <div className="max-w-4xl w-full mx-auto p-4">
+                        <div className="max-w-4xl w-full mx-auto p-4 space-y-4">
+                            {/* 國考日期設定 */}
+                            <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 animate-fade-in">
+                                <h3 className="font-bold text-teal-800 text-sm mb-3 flex items-center gap-2">📅 國考日期設定</h3>
+                                <div className="flex items-center gap-3">
+                                    <input type="date" value={examDate || ''} onChange={async (e) => {
+                                        const val = e.target.value;
+                                        setExamDate(val || null);
+                                        try { await supabase.from('system_config').upsert({ key: 'exam_date', value: val || null }, { onConflict: 'key' }); } catch(e) { console.error(e); }
+                                    }} className="px-3 py-2 border-2 border-teal-200 rounded-xl focus:outline-none focus:border-teal-400 text-sm text-slate-700 bg-white" />
+                                    <span className="text-xs text-teal-700">{examDate ? `倒數 ${daysUntilExam} 天` : '尚未設定'}</span>
+                                    {examDate && <button onClick={async () => { setExamDate(null); try { await supabase.from('system_config').upsert({ key: 'exam_date', value: null }, { onConflict: 'key' }); } catch(e) {} }} className="text-xs text-red-500 hover:text-red-700 underline">清除</button>}
+                                </div>
+                            </div>
+                            {/* 管理員名單 */}
                             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 animate-fade-in">
                                 <h2 className="font-bold text-amber-800 mb-4 flex items-center gap-2"><Icons.Shield /> 管理員名單</h2>
                                 <div className="flex gap-2 mb-4">
@@ -1621,7 +1721,6 @@
                                                         const st = qStates[q.uid] || {};
                                                         const s = st.status || 'unanswered';
                                                         const c = st.confidence;
-                                                        // 四象限色彩：真懂=綠、運氣=橙、危險迷思=紅、知識空白=紫、未答=灰
                                                         let bc = "jump-btn-default";
                                                         if (s === 'correct' && c === 'sure') bc = "jump-btn-correct";
                                                         else if (s === 'correct' && c === 'guess') bc = "jump-btn-viewed";
@@ -1694,6 +1793,234 @@
                                                 {Array.from({ length: totalPages }, (_, i) => (
                                                     <button key={i} onClick={() => { setReviewPage(i); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${i === safePage ? 'bg-teal-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{i + 1}</button>
                                                 ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+
+                        {/* ── 學習儀表板 Tab ── */}
+                        <div className={activeTab === 'dashboard' ? 'block animate-fade-in' : 'hidden'}>
+                            {(() => {
+                                // 計算四象限統計
+                                const allStates = Object.values(qStates).filter(s => s && s.status && s.status !== 'unanswered' && s.confidence);
+                                const counts = { mastered: 0, lucky: 0, myth: 0, blank: 0 };
+                                allStates.forEach(s => { const qk = getQuadrant(s.status, s.confidence); if (qk) counts[qk]++; });
+                                const totalAnswered = allStates.length;
+                                const masteredPct = totalAnswered > 0 ? Math.round((counts.mastered / totalAnswered) * 100) : 0;
+                                const sureAnswers = allStates.filter(s => s.confidence === 'sure');
+                                const sureCorrect = sureAnswers.filter(s => s.status === 'correct').length;
+                                const calibrationPct = sureAnswers.length > 0 ? Math.round((sureCorrect / sureAnswers.length) * 100) : 0;
+
+                                // 科別統計
+                                const deptStats = (() => {
+                                    const map = {};
+                                    Object.entries(qStates).forEach(([uid, s]) => {
+                                        if (!s || !s.confidence || s.status === 'unanswered') return;
+                                        const kwSet = prebuiltIndex.uidToKeywords.get(uid);
+                                        if (!kwSet) return;
+                                        // 用 uid 前綴推測科別（簡化：從知識圖譜反查）
+                                        const qk = getQuadrant(s.status, s.confidence);
+                                        if (!qk) return;
+                                        kwSet.forEach(kw => {
+                                            // 找到這個 keyword 屬於哪個科
+                                            knowledgeGraphData.forEach(dept => {
+                                                const deptName = dept.name;
+                                                const checkCats = (cats) => cats.some(cat => cat.keywords?.some(k => k.word === kw));
+                                                let found = false;
+                                                if (dept.isSubdivided) {
+                                                    dept.children?.forEach(sub => { if (checkCats(sub.categories || [])) found = true; });
+                                                } else { if (checkCats(dept.categories || [])) found = true; }
+                                                if (found) {
+                                                    if (!map[deptName]) map[deptName] = { name: deptName, mastered: 0, lucky: 0, myth: 0, blank: 0, total: 0 };
+                                                    map[deptName][qk]++;
+                                                    map[deptName].total++;
+                                                }
+                                            });
+                                        });
+                                    });
+                                    return Object.values(map).filter(d => d.total >= 3);
+                                })();
+
+                                if (totalAnswered === 0) return (
+                                    <div className="text-center p-12 bg-white rounded-2xl border border-slate-200">
+                                        <div className="text-4xl mb-4">📊</div>
+                                        <p className="text-slate-500 font-bold text-lg mb-2">尚無學習數據</p>
+                                        <p className="text-slate-400 text-sm">開始作答題目並完成信心評估後，你的學習進度分析將在這裡呈現。</p>
+                                    </div>
+                                );
+
+                                const Q_COLORS = { mastered: '#10b981', lucky: '#f59e0b', myth: '#ef4444', blank: '#818cf8' };
+
+                                return (
+                                    <div className="space-y-4">
+                                        {/* 信心評估說明 */}
+                                        <details className="bg-white rounded-2xl border border-slate-200 p-5">
+                                            <summary className="cursor-pointer text-sm font-bold text-slate-500 hover:text-teal-600 transition-colors flex items-center gap-2">
+                                                💡 什麼是信心評估？四象限代表什麼？如何幫助我學習？
+                                            </summary>
+                                            <div className="mt-4 space-y-4 text-sm text-slate-600 leading-relaxed">
+                                                <div>
+                                                    <h4 className="font-bold text-teal-700 mb-2">① 如何選擇「確定」或「猜的」？</h4>
+                                                    <p className="mb-2">不是問你「知不知道答案」，而是：<strong>「如果這題換一個類似的臨床情境，我還能答對嗎？」</strong></p>
+                                                    <p><strong>💪 我很確定</strong> = 能說出為什麼選這個，也能說出其他選項為什麼錯。</p>
+                                                    <p><strong>🤔 我在猜</strong> = 在兩個以上選項間猶豫過；靠刪去法或直覺選的；有選項觀念不熟。</p>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-amber-700 mb-2">② 四象限狀態系統</h4>
+                                                    <p>🟢 <strong>真懂</strong>（答對+確定）— 已內化，考試能穩定輸出。</p>
+                                                    <p>🟡 <strong>運氣</strong>（答對+猜的）— 這次對了，但換情境可能不行。</p>
+                                                    <p>🔴 <strong>危險迷思</strong>（答錯+確定）— 最危險！帶著錯誤信念，會有信心地選錯。</p>
+                                                    <p>🟣 <strong>知識空白</strong>（答錯+猜的）— 知道自己不會，至少有自覺。</p>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-sky-700 mb-2">③ 狀態會隨學習自然進步</h4>
+                                                    <p>每次複習重新作答，系統會自動根據最新表現更新狀態。你的目標是讓越來越多題目變成 🟢 真懂。</p>
+                                                </div>
+                                                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                                                    <h4 className="font-bold text-slate-600 mb-1 text-xs">⏳ 關於「看懂」和「記住」</h4>
+                                                    <p className="text-xs text-slate-500">「看懂解析」≠「真正記住」。認知科學稱之為「流暢性錯覺」。真正的記憶需要「遺忘 → 重新提取」的循環。今天看懂的題目，幾天後再做一次，才是真正的學會。</p>
+                                                </div>
+                                            </div>
+                                        </details>
+
+                                        {/* 四象限摘要 + 校準度 */}
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                            {[
+                                                { key: 'mastered', label: '🟢 真懂', color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200' },
+                                                { key: 'lucky', label: '🟡 運氣', color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200' },
+                                                { key: 'myth', label: '🔴 危險迷思', color: 'text-red-600', bg: 'bg-red-50 border-red-200' },
+                                                { key: 'blank', label: '🟣 知識空白', color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-200' },
+                                            ].map(item => (
+                                                <div key={item.key} className={`rounded-xl border p-4 ${item.bg}`}>
+                                                    <div className="text-xs font-bold text-slate-500 mb-1">{item.label}</div>
+                                                    <div className={`text-2xl font-black ${item.color}`}>{counts[item.key]} <span className="text-sm font-bold">題</span></div>
+                                                    <div className="text-[11px] text-slate-400 font-bold">{totalAnswered > 0 ? Math.round((counts[item.key] / totalAnswered) * 100) : 0}%</div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* 真懂率 + 校準度 */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                                                <h3 className="text-sm font-bold text-slate-500 mb-3">整體真懂率</h3>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-5xl font-black text-emerald-600">{masteredPct}%</span>
+                                                    <span className="text-sm text-slate-400">({counts.mastered}/{totalAnswered} 題)</span>
+                                                </div>
+                                                <div className="mt-3 h-3 bg-slate-100 rounded-full overflow-hidden flex">
+                                                    {['mastered','lucky','myth','blank'].map(k => {
+                                                        const pct = (counts[k] / totalAnswered) * 100;
+                                                        if (pct === 0) return null;
+                                                        return <div key={k} style={{ width: `${pct}%`, background: Q_COLORS[k] }} />;
+                                                    })}
+                                                </div>
+                                                <div className="flex gap-3 mt-2">
+                                                    {Object.entries(Q_LABELS).map(([k, v]) => (
+                                                        <span key={k} className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
+                                                            <span className="w-2 h-2 rounded-sm inline-block" style={{ background: Q_COLORS[k] }}></span>
+                                                            {v.label}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                                                <h3 className="text-sm font-bold text-slate-500 mb-3">信心校準度</h3>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className={`text-5xl font-black ${calibrationPct >= 80 ? 'text-emerald-600' : calibrationPct >= 60 ? 'text-amber-500' : 'text-red-500'}`}>{calibrationPct}%</span>
+                                                    <span className="text-sm text-slate-400">({sureCorrect}/{sureAnswers.length})</span>
+                                                </div>
+                                                <p className="text-xs text-slate-400 mt-2">你選「確定」的題目中，實際答對的比例。</p>
+                                                <div className="mt-3 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                    <div className={`h-full rounded-full ${calibrationPct >= 80 ? 'bg-emerald-500' : calibrationPct >= 60 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${calibrationPct}%` }} />
+                                                </div>
+                                                <p className={`text-[11px] mt-2 font-bold ${calibrationPct >= 80 ? 'text-emerald-600' : calibrationPct >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                                                    {calibrationPct >= 80 ? '校準良好 — 你的自我判斷很準確' : calibrationPct >= 60 ? '尚可 — 對不太確定的題目再謹慎些' : '偏低 — 建議多選「猜的」，建立真實自覺'}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* 科別四象限分佈 */}
+                                        {deptStats.length > 0 && (
+                                            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <div>
+                                                        <h3 className="text-sm font-bold text-slate-700">各科學習狀態</h3>
+                                                        <p className="text-[11px] text-slate-400 mt-0.5">依真懂率由低到高排序 · 綠色超過虛線即達標（60%）</p>
+                                                    </div>
+                                                    {daysUntilExam != null && (
+                                                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border ${daysUntilExam > 30 ? 'bg-sky-50 text-sky-600 border-sky-200' : daysUntilExam > 14 ? 'bg-amber-50 text-amber-600 border-amber-200' : daysUntilExam > 7 ? 'bg-red-50 text-red-600 border-red-200' : 'bg-purple-50 text-purple-600 border-purple-200'}`}>
+                                                            {daysUntilExam > 30 ? '📚 基礎建設期' : daysUntilExam > 14 ? '🔄 鞏固期' : daysUntilExam > 7 ? '⚡ 衝刺期' : '🧘 維持期'} · 倒數 {daysUntilExam} 天
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* 階段策略 */}
+                                                {daysUntilExam != null && (
+                                                    <div className="bg-slate-50 rounded-xl p-3 mb-4 border border-slate-100">
+                                                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                                                            {daysUntilExam > 30 ? '📚 現階段重點：填補知識空白、建立廣度。優先處理紫色比例高的科目，從重要考點開始。' :
+                                                             daysUntilExam > 14 ? '🔄 現階段重點：把 🟡 運氣題透過間隔複習推進到 🟢 真懂。同時持續消滅 🔴 危險迷思。' :
+                                                             daysUntilExam > 7 ? '⚡ 衝刺重點：第一優先消滅 🔴 危險迷思（最容易撿分）。第二快速過 🟡 運氣題。不建議再補新知識。' :
+                                                             '🧘 只做「真懂」題目保持手感。適度休息比多做 50 題更重要。你已經準備好了。'}
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* 圖例 */}
+                                                <div className="flex gap-3 mb-3">
+                                                    {Object.entries(Q_LABELS).map(([k, v]) => (
+                                                        <span key={k} className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
+                                                            <span className="w-2 h-2 rounded-sm inline-block" style={{ background: Q_COLORS[k] }}></span>{v.label}
+                                                        </span>
+                                                    ))}
+                                                </div>
+
+                                                {/* 科別條狀圖 */}
+                                                <div className="space-y-1.5">
+                                                    {deptStats.sort((a, b) => (a.mastered / a.total) - (b.mastered / b.total)).map(dept => {
+                                                        const mPct = Math.round((dept.mastered / dept.total) * 100);
+                                                        return (
+                                                            <div key={dept.name} className="flex items-center gap-2.5 py-1">
+                                                                <span className="text-xs font-bold text-slate-400 w-24 text-right truncate flex-shrink-0">{dept.name.replace(/^\d+\s*/, '')}</span>
+                                                                <div className="flex-1 h-6 rounded-md overflow-hidden flex bg-slate-100 relative">
+                                                                    {['mastered', 'lucky', 'myth', 'blank'].map(key => {
+                                                                        const pct = (dept[key] / dept.total) * 100;
+                                                                        if (pct === 0) return null;
+                                                                        const isMastered = key === 'mastered';
+                                                                        return (
+                                                                            <div key={key} className={`relative ${isMastered ? '' : 'group/seg'}`} style={{ width: `${pct}%`, background: Q_COLORS[key], opacity: 0.85 }}>
+                                                                                {isMastered && pct >= 8 && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><span className="text-[9px] font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{mPct}%</span></div>}
+                                                                                {!isMastered && <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/seg:opacity-100 transition-opacity pointer-events-none"><span className="text-[9px] font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{Math.round(pct)}%</span></div>}
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                    <div className="absolute top-0 bottom-0 w-px border-l border-dashed border-slate-400/50 pointer-events-none" style={{ left: '60%' }}></div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {/* 針對性建議 */}
+                                                {(() => {
+                                                    const mythHigh = deptStats.filter(d => d.myth / d.total > 0.08);
+                                                    const blankHigh = deptStats.filter(d => d.blank / d.total > 0.4);
+                                                    const luckyHigh = deptStats.filter(d => d.lucky / d.total > 0.25 && d.myth / d.total <= 0.08);
+                                                    const strong = deptStats.filter(d => d.mastered / d.total >= 0.6);
+                                                    const stripNum = (n) => n.replace(/^\d+\s*/, '');
+                                                    if (!mythHigh.length && !blankHigh.length && !luckyHigh.length && !strong.length) return null;
+                                                    return (
+                                                        <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
+                                                            <h4 className="text-xs font-bold text-slate-400 mb-2">📋 針對性準備建議</h4>
+                                                            {mythHigh.length > 0 && <div className="flex gap-2 items-start bg-red-50 rounded-lg p-3 border border-red-100"><span className="flex-shrink-0 text-sm">🔴</span><div><div className="text-red-600 font-bold text-xs mb-0.5">最優先：修正危險迷思</div><p className="text-slate-500 text-[11px] leading-relaxed"><strong>{mythHigh.map(d => stripNum(d.name)).join('、')}</strong> 的迷思比例較高。回到錯題，找出觀念偏差的根源。</p></div></div>}
+                                                            {blankHigh.length > 0 && <div className="flex gap-2 items-start bg-indigo-50 rounded-lg p-3 border border-indigo-100"><span className="flex-shrink-0 text-sm">🟣</span><div><div className="text-indigo-600 font-bold text-xs mb-0.5">需要補強</div><p className="text-slate-500 text-[11px] leading-relaxed"><strong>{blankHigh.map(d => stripNum(d.name)).join('、')}</strong> 知識空白較多。從重要考點開始建立核心觀念。</p></div></div>}
+                                                            {luckyHigh.length > 0 && <div className="flex gap-2 items-start bg-amber-50 rounded-lg p-3 border border-amber-100"><span className="flex-shrink-0 text-sm">🟡</span><div><div className="text-amber-600 font-bold text-xs mb-0.5">值得鞏固</div><p className="text-slate-500 text-[11px] leading-relaxed"><strong>{luckyHigh.map(d => stripNum(d.name)).join('、')}</strong> 隔幾天重做一次，把運氣推進到真懂。</p></div></div>}
+                                                            {strong.length > 0 && <div className="flex gap-2 items-start bg-emerald-50 rounded-lg p-3 border border-emerald-100"><span className="flex-shrink-0 text-sm">🟢</span><div><div className="text-emerald-600 font-bold text-xs mb-0.5">表現穩定</div><p className="text-slate-500 text-[11px] leading-relaxed"><strong>{strong.map(d => stripNum(d.name)).join('、')}</strong> 真懂率達標，可降低頻率讓時間給弱科。</p></div></div>}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                         )}
                                     </div>
