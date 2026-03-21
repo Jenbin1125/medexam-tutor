@@ -1813,32 +1813,37 @@
                                 const sureCorrect = sureAnswers.filter(s => s.status === 'correct').length;
                                 const calibrationPct = sureAnswers.length > 0 ? Math.round((sureCorrect / sureAnswers.length) * 100) : 0;
 
-                                // 科別統計
+                                // 科別統計（只計算使用者實際點選的知識點所屬科別）
                                 const deptStats = (() => {
+                                    // 建立 UID → 科別 的精確映射（透過知識圖譜的 keyword.uids）
+                                    const uidToDept = new Map();
+                                    knowledgeGraphData.forEach(dept => {
+                                        const deptName = dept.name;
+                                        const mapUids = (cats) => {
+                                            cats.forEach(cat => {
+                                                cat.keywords?.forEach(kw => {
+                                                    kw.uids?.forEach(uid => {
+                                                        // 只記錄第一個映射到的科別（避免重複計算）
+                                                        if (!uidToDept.has(uid)) uidToDept.set(uid, deptName);
+                                                    });
+                                                });
+                                            });
+                                        };
+                                        if (dept.isSubdivided) {
+                                            dept.children?.forEach(sub => mapUids(sub.categories || []));
+                                        } else { mapUids(dept.categories || []); }
+                                    });
+
                                     const map = {};
                                     Object.entries(qStates).forEach(([uid, s]) => {
                                         if (!s || !s.confidence || s.status === 'unanswered') return;
-                                        const kwSet = prebuiltIndex.uidToKeywords.get(uid);
-                                        if (!kwSet) return;
-                                        // 用 uid 前綴推測科別（簡化：從知識圖譜反查）
                                         const qk = getQuadrant(s.status, s.confidence);
                                         if (!qk) return;
-                                        kwSet.forEach(kw => {
-                                            // 找到這個 keyword 屬於哪個科
-                                            knowledgeGraphData.forEach(dept => {
-                                                const deptName = dept.name;
-                                                const checkCats = (cats) => cats.some(cat => cat.keywords?.some(k => k.word === kw));
-                                                let found = false;
-                                                if (dept.isSubdivided) {
-                                                    dept.children?.forEach(sub => { if (checkCats(sub.categories || [])) found = true; });
-                                                } else { if (checkCats(dept.categories || [])) found = true; }
-                                                if (found) {
-                                                    if (!map[deptName]) map[deptName] = { name: deptName, mastered: 0, lucky: 0, myth: 0, blank: 0, total: 0 };
-                                                    map[deptName][qk]++;
-                                                    map[deptName].total++;
-                                                }
-                                            });
-                                        });
+                                        const deptName = uidToDept.get(uid);
+                                        if (!deptName) return;
+                                        if (!map[deptName]) map[deptName] = { name: deptName, mastered: 0, lucky: 0, myth: 0, blank: 0, total: 0 };
+                                        map[deptName][qk]++;
+                                        map[deptName].total++;
                                     });
                                     return Object.values(map).filter(d => d.total >= 3);
                                 })();
@@ -1885,59 +1890,115 @@
                                             </div>
                                         </details>
 
-                                        {/* 四象限摘要 + 校準度 */}
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                            {[
-                                                { key: 'mastered', label: '🟢 真懂', color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200' },
-                                                { key: 'lucky', label: '🟡 運氣', color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200' },
-                                                { key: 'myth', label: '🔴 危險迷思', color: 'text-red-600', bg: 'bg-red-50 border-red-200' },
-                                                { key: 'blank', label: '🟣 知識空白', color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-200' },
-                                            ].map(item => (
-                                                <div key={item.key} className={`rounded-xl border p-4 ${item.bg}`}>
-                                                    <div className="text-xs font-bold text-slate-500 mb-1">{item.label}</div>
-                                                    <div className={`text-2xl font-black ${item.color}`}>{counts[item.key]} <span className="text-sm font-bold">題</span></div>
-                                                    <div className="text-[11px] text-slate-400 font-bold">{totalAnswered > 0 ? Math.round((counts[item.key] / totalAnswered) * 100) : 0}%</div>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        {/* 真懂率 + 校準度 */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                                                <h3 className="text-sm font-bold text-slate-500 mb-3">整體真懂率</h3>
-                                                <div className="flex items-baseline gap-2">
-                                                    <span className="text-5xl font-black text-emerald-600">{masteredPct}%</span>
-                                                    <span className="text-sm text-slate-400">({counts.mastered}/{totalAnswered} 題)</span>
-                                                </div>
-                                                <div className="mt-3 h-3 bg-slate-100 rounded-full overflow-hidden flex">
-                                                    {['mastered','lucky','myth','blank'].map(k => {
-                                                        const pct = (counts[k] / totalAnswered) * 100;
-                                                        if (pct === 0) return null;
-                                                        return <div key={k} style={{ width: `${pct}%`, background: Q_COLORS[k] }} />;
-                                                    })}
-                                                </div>
-                                                <div className="flex gap-3 mt-2">
-                                                    {Object.entries(Q_LABELS).map(([k, v]) => (
-                                                        <span key={k} className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
-                                                            <span className="w-2 h-2 rounded-sm inline-block" style={{ background: Q_COLORS[k] }}></span>
-                                                            {v.label}
-                                                        </span>
-                                                    ))}
+                                        {/* 四象限圓環 + 本週學習 + 校準度 */}
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                                            {/* 左：四象限圓環 */}
+                                            <div className="md:col-span-7 bg-white rounded-2xl border border-slate-200 p-6">
+                                                <h3 className="text-sm font-bold text-slate-500 mb-4">目前四象限分佈</h3>
+                                                <div className="flex items-center gap-6">
+                                                    {/* SVG 空心圓餅圖 */}
+                                                    <svg viewBox="0 0 120 120" width="140" height="140" className="flex-shrink-0">
+                                                        {(() => {
+                                                            const r = 50, circumference = 2 * Math.PI * r;
+                                                            const segments = [
+                                                                { key: 'mastered', value: counts.mastered },
+                                                                { key: 'lucky', value: counts.lucky },
+                                                                { key: 'myth', value: counts.myth },
+                                                                { key: 'blank', value: counts.blank },
+                                                            ];
+                                                            let offset = 0;
+                                                            return segments.map(seg => {
+                                                                const pct = totalAnswered > 0 ? seg.value / totalAnswered : 0;
+                                                                const dash = circumference * pct;
+                                                                const gap = circumference - dash;
+                                                                const el = <circle key={seg.key} cx="60" cy="60" r={r} fill="none" stroke={Q_COLORS[seg.key]} strokeWidth="14" strokeDasharray={`${dash} ${gap}`} strokeDashoffset={-offset} strokeLinecap="butt" transform="rotate(-90 60 60)" style={{ opacity: 0.9 }} />;
+                                                                offset += dash;
+                                                                return el;
+                                                            });
+                                                        })()}
+                                                        <text x="60" y="55" textAnchor="middle" className="fill-slate-800" style={{ fontSize: '22px', fontWeight: 900 }}>{masteredPct}%</text>
+                                                        <text x="60" y="72" textAnchor="middle" className="fill-slate-400" style={{ fontSize: '9px', fontWeight: 700 }}>真懂率</text>
+                                                    </svg>
+                                                    {/* 右側圖例 */}
+                                                    <div className="space-y-2.5 flex-1">
+                                                        {[
+                                                            { key: 'mastered', label: '真懂' },
+                                                            { key: 'lucky', label: '運氣' },
+                                                            { key: 'myth', label: '危險迷思' },
+                                                            { key: 'blank', label: '知識空白' },
+                                                        ].map(item => (
+                                                            <div key={item.key} className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-2.5 h-2.5 rounded-sm" style={{ background: Q_COLORS[item.key] }} />
+                                                                    <span className="text-xs font-bold text-slate-500">{item.label}</span>
+                                                                </div>
+                                                                <div className="flex items-baseline gap-1.5">
+                                                                    <span className="text-sm font-black text-slate-700">{counts[item.key]}</span>
+                                                                    <span className="text-[10px] text-slate-400">{totalAnswered > 0 ? Math.round((counts[item.key] / totalAnswered) * 100) : 0}%</span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                                                <h3 className="text-sm font-bold text-slate-500 mb-3">信心校準度</h3>
-                                                <div className="flex items-baseline gap-2">
-                                                    <span className={`text-5xl font-black ${calibrationPct >= 80 ? 'text-emerald-600' : calibrationPct >= 60 ? 'text-amber-500' : 'text-red-500'}`}>{calibrationPct}%</span>
-                                                    <span className="text-sm text-slate-400">({sureCorrect}/{sureAnswers.length})</span>
+
+                                            {/* 右：本週學習 + 校準度 */}
+                                            <div className="md:col-span-5 flex flex-col gap-3">
+                                                {/* 本週學習 */}
+                                                <div className="bg-white rounded-2xl border border-slate-200 p-5 flex-1">
+                                                    <h3 className="text-xs font-bold text-slate-400 mb-2">本週學習</h3>
+                                                    {(() => {
+                                                        const now = Date.now();
+                                                        const weekAgo = now - 7 * 86400000;
+                                                        const weekCount = Object.values(qStates).filter(s => s && s.answeredAt && s.answeredAt > weekAgo).length;
+                                                        const daySet = new Set();
+                                                        Object.values(qStates).forEach(s => {
+                                                            if (s && s.answeredAt) { const d = new Date(s.answeredAt); daySet.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`); }
+                                                        });
+                                                        let streak = 0;
+                                                        for (let i = 0; i < 30; i++) {
+                                                            const d = new Date(now - i * 86400000);
+                                                            if (daySet.has(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`)) streak++;
+                                                            else if (i > 0) break;
+                                                        }
+                                                        const gc = ['#99f6e4','#5eead4','#2dd4bf','#14b8a6','#0d9488','#0f766e','#115e59'];
+                                                        return (<>
+                                                            <div className="flex items-baseline gap-1 mb-1">
+                                                                <span className="text-3xl font-black text-slate-800">{weekCount}</span>
+                                                                <span className="text-sm text-slate-400 font-bold">題</span>
+                                                            </div>
+                                                            <p className="text-[10px] text-slate-400 mb-3">已連續學習 <span className="text-teal-600 font-bold">{streak}</span> 天</p>
+                                                            <div className="flex gap-1">
+                                                                {[1,2,3,4,5,6,7].map(day => (
+                                                                    <div key={day} className={`flex-1 h-7 rounded-md flex items-center justify-center text-[10px] font-black ${day <= streak ? 'text-white' : 'text-slate-300 bg-slate-50 border border-slate-200'}`}
+                                                                        style={day <= streak ? { background: gc[day-1] } : {}}>
+                                                                        {day}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                            {streak >= 7 ? <p className="text-[10px] text-amber-600 font-bold mt-2.5">🔥 完美的一週！考場上你會感謝現在的自己。</p>
+                                                            : streak >= 4 ? <p className="text-[10px] text-teal-600 font-bold mt-2.5">💪 穩定累積中！差距就是這樣拉開的。</p>
+                                                            : streak >= 1 ? <p className="text-[10px] text-slate-400 font-bold mt-2.5">🌱 每一天都算數，今天也來做幾題吧！</p>
+                                                            : null}
+                                                        </>);
+                                                    })()}
                                                 </div>
-                                                <p className="text-xs text-slate-400 mt-2">你選「確定」的題目中，實際答對的比例。</p>
-                                                <div className="mt-3 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                    <div className={`h-full rounded-full ${calibrationPct >= 80 ? 'bg-emerald-500' : calibrationPct >= 60 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${calibrationPct}%` }} />
+
+                                                {/* 信心校準度 */}
+                                                <div className="bg-white rounded-2xl border border-slate-200 p-5 flex-1">
+                                                    <h3 className="text-xs font-bold text-slate-400 mb-2">信心校準度</h3>
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className={`text-3xl font-black ${calibrationPct >= 80 ? 'text-emerald-600' : calibrationPct >= 60 ? 'text-amber-500' : 'text-red-500'}`}>{calibrationPct}%</span>
+                                                        <span className="text-xs text-slate-400">({sureCorrect}/{sureAnswers.length})</span>
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-400 mt-1">你選「確定」的題目中實際答對的比例</p>
+                                                    <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                        <div className={`h-full rounded-full ${calibrationPct >= 80 ? 'bg-emerald-500' : calibrationPct >= 60 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${calibrationPct}%` }} />
+                                                    </div>
+                                                    <p className={`text-[10px] mt-1.5 font-bold leading-relaxed ${calibrationPct >= 80 ? 'text-emerald-600' : calibrationPct >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+                                                        {calibrationPct >= 80 ? '校準良好 — 你對自己的掌握程度判斷很準確，繼續保持！' : calibrationPct >= 60 ? '持續進步中 — 有些你覺得確定的題目其實還不太穩。看完解析後，問自己：我能完整解釋其他選項為什麼錯嗎？' : '值得留意 — 你可能對某些觀念有誤解但尚未察覺。這正是信心評估幫你發現的價值。遇到猶豫的題目時，選「猜的」會更誠實。'}
+                                                    </p>
                                                 </div>
-                                                <p className={`text-[11px] mt-2 font-bold ${calibrationPct >= 80 ? 'text-emerald-600' : calibrationPct >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
-                                                    {calibrationPct >= 80 ? '校準良好 — 你的自我判斷很準確' : calibrationPct >= 60 ? '尚可 — 對不太確定的題目再謹慎些' : '偏低 — 建議多選「猜的」，建立真實自覺'}
-                                                </p>
                                             </div>
                                         </div>
 
