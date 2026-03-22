@@ -1835,7 +1835,7 @@
                                         if (!map[dn]) map[dn] = { name: dn, mastered: 0, lucky: 0, myth: 0, blank: 0, total: 0 };
                                         map[dn][qk]++; map[dn].total++;
                                     });
-                                    return Object.values(map).filter(d => d.total >= 3);
+                                    return Object.values(map).filter(d => d.total >= 1);
                                 })();
                                 const Q_COLORS = { mastered: '#10b981', lucky: '#f59e0b', myth: '#ef4444', blank: '#818cf8' };
 
