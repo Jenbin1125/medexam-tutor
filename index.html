@@ -1208,6 +1208,8 @@
             const [showAdmin, setShowAdmin] = React.useState(false);
             const [adminEmails, setAdminEmails] = React.useState([]);
             const [newEmail, setNewEmail] = React.useState('');
+            const [classData, setClassData] = React.useState([]);
+            const [classLoading, setClassLoading] = React.useState(false);
             // --- 意見回饋 State ---
             const [showFeedbackModal, setShowFeedbackModal] = React.useState(false);
             const [feedbackType, setFeedbackType] = React.useState('question_error');
@@ -1496,6 +1498,31 @@
                 if (!error) setAdminEmails(data || []);
             };
 
+            const loadClassData = async () => {
+                setClassLoading(true);
+                try {
+                    const { data: progs } = await supabase.from('user_progress').select('user_id, session_state, updated_at');
+                    if (progs) {
+                        const stats = progs.filter(p => p.session_state && Object.keys(p.session_state).length > 1).map(p => {
+                            const ss = p.session_state;
+                            let mastered=0, lucky=0, myth=0, blank=0, total=0;
+                            Object.entries(ss).forEach(([k, v]) => {
+                                if (k.startsWith('_') || !v?.confidence) return;
+                                total++;
+                                if (v.status==='correct' && v.confidence==='sure') mastered++;
+                                else if (v.status==='correct' && v.confidence==='guess') lucky++;
+                                else if (v.status==='incorrect' && v.confidence==='sure') myth++;
+                                else if (v.status==='incorrect' && v.confidence==='guess') blank++;
+                            });
+                            const cm = Array.isArray(ss._confirmedMastered) ? ss._confirmedMastered.length : 0;
+                            const matchedEmail = adminEmails.find(ae => ae.user_id === p.user_id);
+                            return { user_id: p.user_id, email: matchedEmail?.email || p.user_id.slice(0,8)+'...', total_answered: total, mastered, lucky, myth, blank, last_answered: p.updated_at, confirmed_mastered_count: cm };
+                        });
+                        setClassData(stats.filter(s => s.total_answered > 0));
+                    }
+                } catch(e) { console.error(e); } finally { setClassLoading(false); }
+            };
+
             // ✨ 優化後的 addEmail (加入錯誤捕捉)
             const addEmail = async () => {
                 const e = newEmail.trim().toLowerCase();
@@ -1532,7 +1559,7 @@
                 }
             };
 
-            React.useEffect(() => { if (showAdmin) loadAdminEmails(); }, [showAdmin]);
+            React.useEffect(() => { if (showAdmin) { loadAdminEmails(); loadClassData(); } }, [showAdmin]);
 
             const getProgress = React.useCallback((nodeId) => {
                 const kwIds = prebuiltIndex.nodeKeywordIds.get(nodeId);
@@ -1897,87 +1924,46 @@
                             {/* 全班學習概覽 */}
                             <div className="bg-sky-50 border border-sky-200 rounded-2xl p-6 animate-fade-in">
                                 <h2 className="font-bold text-sky-800 mb-4 flex items-center gap-2"><Icons.Target /> 全班學習概覽</h2>
-                                {(() => {
-                                    const [classData, setClassData] = React.useState([]);
-                                    const [classLoading, setClassLoading] = React.useState(false);
-                                    const loadClass = async () => {
-                                        setClassLoading(true);
-                                        try {
-                                            // 直接從 user_progress 讀取 session_state
-                                            const { data: progs } = await supabase.from('user_progress').select('user_id, session_state, updated_at');
-                                            if (progs) {
-                                                // 取得 email 對應
-                                                const { data: emails } = await supabase.from('allowed_emails').select('email');
-                                                const { data: auths } = await supabase.rpc('get_admin_user_stats').catch(() => ({ data: null }));
-                                                const emailMap = {};
-                                                if (auths) auths.forEach(a => { emailMap[a.email] = true; });
-
-                                                const stats = progs.filter(p => p.session_state && Object.keys(p.session_state).length > 1).map(p => {
-                                                    const ss = p.session_state;
-                                                    let mastered=0, lucky=0, myth=0, blank=0, total=0;
-                                                    Object.entries(ss).forEach(([k, v]) => {
-                                                        if (k.startsWith('_') || !v?.confidence) return;
-                                                        total++;
-                                                        if (v.status==='correct' && v.confidence==='sure') mastered++;
-                                                        else if (v.status==='correct' && v.confidence==='guess') lucky++;
-                                                        else if (v.status==='incorrect' && v.confidence==='sure') myth++;
-                                                        else if (v.status==='incorrect' && v.confidence==='guess') blank++;
-                                                    });
-                                                    const cm = Array.isArray(ss._confirmedMastered) ? ss._confirmedMastered.length : 0;
-                                                    // 嘗試從 adminEmails 匹配 email
-                                                    const matchedEmail = adminEmails.find(ae => ae.user_id === p.user_id);
-                                                    return { user_id: p.user_id, email: matchedEmail?.email || p.user_id.slice(0,8)+'...', total_answered: total, mastered, lucky, myth, blank, last_answered: p.updated_at, confirmed_mastered_count: cm };
-                                                });
-                                                setClassData(stats.filter(s => s.total_answered > 0));
-                                            }
-                                        } catch(e) { console.error(e); } finally { setClassLoading(false); }
-                                    };
-                                    React.useEffect(() => { loadClass(); }, []);
-                                    const QC = { mastered: '#10b981', lucky: '#f59e0b', myth: '#ef4444', blank: '#818cf8' };
-
-                                    return (<>
-                                        <div className="flex items-center justify-between mb-3">
-                                            <span className="text-xs text-sky-600 font-bold">共 {classData.length} 位學生有學習紀錄</span>
-                                            <button onClick={loadClass} disabled={classLoading} className="text-xs text-sky-600 hover:text-sky-800 font-bold flex items-center gap-1">
-                                                {classLoading ? <Icons.Loader2 className="w-3 h-3" /> : <Icons.RotateCcw className="w-3 h-3" />} 重新整理
-                                            </button>
-                                        </div>
-                                        {classData.length === 0 ? (
-                                            <p className="text-sm text-slate-400 text-center py-4">{classLoading ? '載入中...' : '尚無學生學習紀錄'}</p>
-                                        ) : (
-                                            <div className="max-h-96 overflow-y-auto border border-sky-200 rounded-xl bg-white shadow-inner">
-                                                <table className="w-full text-left text-xs whitespace-nowrap">
-                                                    <thead className="sticky top-0 bg-sky-50 shadow-sm z-10">
-                                                        <tr className="text-sky-800">
-                                                            <th className="px-3 py-2.5 font-bold border-b border-sky-200">學生</th>
-                                                            <th className="px-3 py-2.5 font-bold text-center border-b border-sky-200">已答</th>
-                                                            <th className="px-3 py-2.5 font-bold border-b border-sky-200 w-40">四象限分佈</th>
-                                                            <th className="px-3 py-2.5 font-bold text-center border-b border-sky-200">真懂率</th>
-                                                            <th className="px-3 py-2.5 font-bold text-center border-b border-sky-200">精熟</th>
-                                                            <th className="px-3 py-2.5 font-bold border-b border-sky-200">最後活動</th>
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-xs text-sky-600 font-bold">共 {classData.length} 位學生有學習紀錄</span>
+                                    <button onClick={loadClassData} disabled={classLoading} className="text-xs text-sky-600 hover:text-sky-800 font-bold flex items-center gap-1">
+                                        {classLoading ? <Icons.Loader2 className="w-3 h-3" /> : <Icons.RotateCcw className="w-3 h-3" />} 重新整理
+                                    </button>
+                                </div>
+                                {classData.length === 0 ? (
+                                    <p className="text-sm text-slate-400 text-center py-4">{classLoading ? '載入中...' : '尚無學生學習紀錄'}</p>
+                                ) : (
+                                    <div className="max-h-96 overflow-y-auto border border-sky-200 rounded-xl bg-white shadow-inner">
+                                        <table className="w-full text-left text-xs whitespace-nowrap">
+                                            <thead className="sticky top-0 bg-sky-50 shadow-sm z-10">
+                                                <tr className="text-sky-800">
+                                                    <th className="px-3 py-2.5 font-bold border-b border-sky-200">學生</th>
+                                                    <th className="px-3 py-2.5 font-bold text-center border-b border-sky-200">已答</th>
+                                                    <th className="px-3 py-2.5 font-bold border-b border-sky-200 w-40">四象限分佈</th>
+                                                    <th className="px-3 py-2.5 font-bold text-center border-b border-sky-200">真懂率</th>
+                                                    <th className="px-3 py-2.5 font-bold text-center border-b border-sky-200">精熟</th>
+                                                    <th className="px-3 py-2.5 font-bold border-b border-sky-200">最後活動</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-sky-50">
+                                                {classData.sort((a,b) => b.total_answered - a.total_answered).map(s => {
+                                                    const tot = s.total_answered || 1;
+                                                    const mPct = Math.round((s.mastered / tot) * 100);
+                                                    return (
+                                                        <tr key={s.user_id} className="hover:bg-sky-50/50 transition-colors">
+                                                            <td className="px-3 py-2.5 font-mono text-slate-600 text-[11px] max-w-[140px] truncate">{s.email}</td>
+                                                            <td className="px-3 py-2.5 text-center font-bold text-slate-700">{s.total_answered}</td>
+                                                            <td className="px-3 py-2.5"><div className="flex h-3.5 rounded-md overflow-hidden bg-slate-100">{['mastered','lucky','myth','blank'].map(k => { const pct=(s[k]/tot)*100; return pct>0 ? <div key={k} style={{width:`${pct}%`,background:{'mastered':'#10b981','lucky':'#f59e0b','myth':'#ef4444','blank':'#818cf8'}[k],opacity:0.85}} title={`${k}: ${s[k]}`}/> : null; })}</div></td>
+                                                            <td className={`px-3 py-2.5 text-center font-black ${mPct>=60?'text-emerald-600':mPct>=30?'text-amber-500':'text-red-500'}`}>{mPct}%</td>
+                                                            <td className="px-3 py-2.5 text-center text-slate-500">{s.confirmed_mastered_count}</td>
+                                                            <td className="px-3 py-2.5 text-slate-400 text-[10px] font-mono">{s.last_answered ? new Date(s.last_answered).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}) : '-'}</td>
                                                         </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-sky-50">
-                                                        {classData.sort((a,b) => b.total_answered - a.total_answered).map(s => {
-                                                            const tot = s.total_answered || 1;
-                                                            const mPct = Math.round((s.mastered / tot) * 100);
-                                                            return (
-                                                                <tr key={s.user_id} className="hover:bg-sky-50/50 transition-colors">
-                                                                    <td className="px-3 py-2.5 font-mono text-slate-600 text-[11px] max-w-[140px] truncate">{s.email}</td>
-                                                                    <td className="px-3 py-2.5 text-center font-bold text-slate-700">{s.total_answered}</td>
-                                                                    <td className="px-3 py-2.5"><div className="flex h-3.5 rounded-md overflow-hidden bg-slate-100">{['mastered','lucky','myth','blank'].map(k => { const pct=(s[k]/tot)*100; return pct>0 ? <div key={k} style={{width:`${pct}%`,background:QC[k],opacity:0.85}} title={`${k}: ${s[k]}`}/> : null; })}</div></td>
-                                                                    <td className={`px-3 py-2.5 text-center font-black ${mPct>=60?'text-emerald-600':mPct>=30?'text-amber-500':'text-red-500'}`}>{mPct}%</td>
-                                                                    <td className="px-3 py-2.5 text-center text-slate-500">{s.confirmed_mastered_count}</td>
-                                                                    <td className="px-3 py-2.5 text-slate-400 text-[10px] font-mono">{s.last_answered ? new Date(s.last_answered).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}) : '-'}</td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        )}
-                                    </>);
-                                })()}
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
 
                         </div>
