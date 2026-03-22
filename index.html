@@ -1103,6 +1103,102 @@
                 if (userId && confirmedMastered.size > 0) localStorage.setItem(`medtutor_confirmed_${userId}`, JSON.stringify([...confirmedMastered]));
             }, [confirmedMastered, userId]);
             const confirmMastery = (uid) => { setConfirmedMastered(p => { const n = new Set(p); n.add(uid); return n; }); };
+
+            // ── 智慧選題系統 ──
+            const [smartPickQuestions, setSmartPickQuestions] = React.useState(() => {
+                try { const s = localStorage.getItem(`medtutor_smartpick_${userId}`); return s ? JSON.parse(s) : []; } catch { return []; }
+            });
+            const [smartPickLoading, setSmartPickLoading] = React.useState(false);
+            const [smartPickMeta, setSmartPickMeta] = React.useState(null); // { importantCount, hotCount, weakCount }
+
+            React.useEffect(() => {
+                if (userId) localStorage.setItem(`medtutor_smartpick_${userId}`, JSON.stringify(smartPickQuestions));
+            }, [smartPickQuestions, userId]);
+
+            const generateSmartPick = async () => {
+                setSmartPickLoading(true);
+                try {
+                    // 收集各層級未覆蓋的知識點
+                    const importantUncovered = []; const hotUncovered = [];
+                    const deptUncoveredUids = {};
+                    const answeredUids = new Set(Object.keys(qStates).filter(uid => qStates[uid]?.confidence));
+
+                    knowledgeGraphData.forEach(dept => {
+                        const scanCats = (cats) => cats.forEach(cat => {
+                            const isImportant = cat.name.includes('重要');
+                            const isHot = cat.name.includes('熱門');
+                            cat.keywords?.forEach(kw => {
+                                const done = kw.uids?.some(uid => answeredUids.has(uid));
+                                if (!done && kw.uids?.length > 0) {
+                                    const pickUid = kw.uids[Math.floor(Math.random() * kw.uids.length)];
+                                    if (isImportant) importantUncovered.push({ uid: pickUid, kwWord: kw.word, dept: dept.name, tier: 'important' });
+                                    else if (isHot) hotUncovered.push({ uid: pickUid, kwWord: kw.word, dept: dept.name, tier: 'hot' });
+                                }
+                                // 統計每科未作答的 UIDs
+                                kw.uids?.forEach(uid => {
+                                    if (!answeredUids.has(uid)) {
+                                        if (!deptUncoveredUids[dept.name]) deptUncoveredUids[dept.name] = [];
+                                        deptUncoveredUids[dept.name].push(uid);
+                                    }
+                                });
+                            });
+                        });
+                        if (dept.isSubdivided) dept.children?.forEach(sub => scanCats(sub.categories || []));
+                        else scanCats(dept.categories || []);
+                    });
+
+                    // 選題邏輯：重要 → 熱門 → 弱科
+                    let picks = [];
+                    // 打亂順序避免每次都同科
+                    const shuffle = arr => arr.sort(() => Math.random() - 0.5);
+                    shuffle(importantUncovered);
+                    shuffle(hotUncovered);
+
+                    const usedUids = new Set();
+                    const addPick = (item) => { if (!usedUids.has(item.uid)) { usedUids.add(item.uid); picks.push(item); } };
+
+                    // 優先級 1：未覆蓋重要（最多 10 題）
+                    importantUncovered.slice(0, 10).forEach(addPick);
+                    // 優先級 2：未覆蓋熱門（填到 20 題）
+                    hotUncovered.forEach(item => { if (picks.length < 20) addPick(item); });
+                    // 優先級 3：弱科補強
+                    if (picks.length < 20) {
+                        const sortedDepts = Object.entries(deptUncoveredUids).sort((a, b) => b[1].length - a[1].length);
+                        for (const [deptName, uids] of sortedDepts) {
+                            if (picks.length >= 20) break;
+                            const shuffled = [...uids].sort(() => Math.random() - 0.5);
+                            for (const uid of shuffled) {
+                                if (picks.length >= 20) break;
+                                addPick({ uid, kwWord: '', dept: deptName, tier: 'weak' });
+                            }
+                        }
+                    }
+
+                    const meta = {
+                        importantCount: picks.filter(p => p.tier === 'important').length,
+                        hotCount: picks.filter(p => p.tier === 'hot').length,
+                        weakCount: picks.filter(p => p.tier === 'weak').length,
+                    };
+
+                    // 從 Supabase 載入題目
+                    const pickUids = picks.map(p => p.uid);
+                    if (pickUids.length === 0) { setSmartPickQuestions([]); setSmartPickMeta(meta); return; }
+                    const { data } = await supabase.from('questions').select('*').in('uid', pickUids);
+                    // 保持選題排序
+                    const order = new Map(pickUids.map((u, i) => [u, i]));
+                    data?.sort((a, b) => (order.get(a.uid) ?? 999) - (order.get(b.uid) ?? 999));
+
+                    // 初始化 qStates
+                    setQStates(prev => {
+                        const next = { ...prev };
+                        data?.forEach(q => { if (!next[q.uid]) next[q.uid] = { answerSelected: null, status: 'unanswered', openStates: [true, false, false], showExpl: false }; });
+                        return next;
+                    });
+
+                    setSmartPickQuestions(data || []);
+                    setSmartPickMeta(meta);
+                } catch (e) { console.error('智慧選題失敗:', e); } finally { setSmartPickLoading(false); }
+            };
             const [reviewQuestions, setReviewQuestions] = React.useState([]);
             const [loadingReview, setLoadingReview] = React.useState(false);
             const REVIEW_PAGE_SIZE = 5;
@@ -1853,12 +1949,74 @@
                                                         <p className="text-[10px] text-slate-500 leading-relaxed">冷門/罕見考點。時間充裕才需要碰，優先級最低。</p>
                                                     </div>
                                                 </div>
-                                                <p className="text-[10px] text-slate-400 leading-relaxed">💡 建議策略：先完成第一層（🔥重要），再推進第二層（⭐熱門）。在知識圖譜中，展開各科目即可看到分類。優先點選尚未打勾的知識點進入做題。</p>
+                                                <p className="text-[10px] text-slate-400 leading-relaxed">💡 建議策略：先完成第一層（🔥重要），再推進第二層（⭐熱門）。可自行在圖譜中點選知識點做題，或使用下方的「智慧選題」自動產生題目清單。</p>
+
+                                                {/* 智慧選題按鈕 */}
+                                                <div className="pt-2 border-t border-slate-100">
+                                                    <button onClick={generateSmartPick} disabled={smartPickLoading}
+                                                        className="w-full px-4 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-700 hover:to-emerald-700 transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
+                                                        {smartPickLoading ? <><Icons.Loader2 className="w-4 h-4" /> 選題中...</> : '🎯 智慧選題（自動產生 20 題）'}
+                                                    </button>
+                                                    {smartPickMeta && !smartPickLoading && (
+                                                        <p className="text-[10px] text-slate-400 text-center mt-2">
+                                                            上次選題：🔥必做 {smartPickMeta.importantCount} 題 + ⭐建議 {smartPickMeta.hotCount} 題{smartPickMeta.weakCount > 0 ? ` + 📊弱科 ${smartPickMeta.weakCount} 題` : ''}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </>);
                                         })()}
                                     </div>
                                 </details>
                             </div>
+
+                            {/* ── 智慧選題待做清單 ── */}
+                            {smartPickQuestions.length > 0 && (
+                                <div className="bg-white rounded-2xl shadow-sm border-2 border-teal-200 p-5 mb-4 animate-fade-in">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-teal-50 border-2 border-teal-200 flex items-center justify-center"><span className="text-teal-700 font-black text-sm">{smartPickQuestions.length}</span></div>
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-700">🎯 智慧選題清單</p>
+                                                <p className="text-[10px] text-slate-400">
+                                                    {smartPickMeta && (<>{smartPickMeta.importantCount > 0 && <span className="text-red-500">🔥{smartPickMeta.importantCount}</span>}{smartPickMeta.hotCount > 0 && <span className="text-amber-500 ml-1.5">⭐{smartPickMeta.hotCount}</span>}{smartPickMeta.weakCount > 0 && <span className="text-sky-500 ml-1.5">📊{smartPickMeta.weakCount}</span>}<span className="ml-1.5">· 可隨時開始做題</span></>)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => {
+                                                setSelectedQuestions(smartPickQuestions);
+                                                setQStates(prev => {
+                                                    const next = { ...prev };
+                                                    smartPickQuestions.forEach(q => { if (!next[q.uid]) next[q.uid] = { answerSelected: null, status: 'unanswered', openStates: [true, false, false], showExpl: false }; });
+                                                    return next;
+                                                });
+                                                setSelectedContext({ subject: '', sub: '', category: '', keyword: { id: '_smartpick_', word: '智慧選題', uids: smartPickQuestions.map(q => q.uid) } });
+                                                setActiveTab('ai-explain');
+                                            }} className="px-4 py-2 rounded-xl text-sm font-bold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">
+                                                開始做題
+                                            </button>
+                                            <button onClick={() => { setSmartPickQuestions([]); setSmartPickMeta(null); localStorage.removeItem(`medtutor_smartpick_${userId}`); }}
+                                                className="px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all" title="清除選題清單">
+                                                ✕
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {/* 進度條 */}
+                                    {(() => {
+                                        const done = smartPickQuestions.filter(q => qStates[q.uid]?.confidence).length;
+                                        const pct = smartPickQuestions.length > 0 ? Math.round((done / smartPickQuestions.length) * 100) : 0;
+                                        return done > 0 ? (
+                                            <div>
+                                                <div className="flex items-center justify-between text-[10px] mb-1">
+                                                    <span className="text-slate-400">進度</span>
+                                                    <span className="font-bold text-teal-600">{done}/{smartPickQuestions.length} 題 ({pct}%)</span>
+                                                </div>
+                                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-teal-500 rounded-full transition-all" style={{width:`${pct}%`}}/></div>
+                                            </div>
+                                        ) : null;
+                                    })()}
+                                </div>
+                            )}
 
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <div className="relative mb-8">
@@ -1905,11 +2063,18 @@
 
                         <div className={activeTab === 'ai-explain' ? 'block animate-fade-in' : 'hidden'}>
                             {!selectedContext.keyword ? (
-                                <div className="text-center p-12 text-slate-400 font-bold bg-white rounded-2xl border border-slate-200">請先由圖譜選擇一個關鍵字單元。</div>
+                                <div className="text-center p-12 text-slate-400 font-bold bg-white rounded-2xl border border-slate-200">請先由圖譜選擇一個關鍵字單元，或使用智慧選題。</div>
                             ) : (
                                 <div>
                                     <div className="mb-4">
-                                        <h2 className="text-3xl font-bold text-slate-800 border-l-4 border-teal-500 pl-4">{selectedContext.keyword.word}</h2>
+                                        {selectedContext.keyword.id === '_smartpick_' ? (
+                                            <div className="flex items-center gap-3">
+                                                <h2 className="text-3xl font-bold text-slate-800 border-l-4 border-teal-500 pl-4">🎯 智慧選題</h2>
+                                                <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">{selectedQuestions.length} 題</span>
+                                            </div>
+                                        ) : (
+                                            <h2 className="text-3xl font-bold text-slate-800 border-l-4 border-teal-500 pl-4">{selectedContext.keyword.word}</h2>
+                                        )}
                                     </div>
 
                                     {loadingQuestions ? (
@@ -1961,26 +2126,29 @@
                                                 {selectedQuestions.map((q, idx) => renderQuestion(q, idx, qStates[q.uid]))}
                                             </div>
 
-                                            {/* ── 本知識點已完成按鈕 ── */}
+                                            {/* ── 完成按鈕 ── */}
                                             {(() => {
                                                 const allAnswered = selectedQuestions.length > 0 && selectedQuestions.every(q => {
                                                     const st = qStates[q.uid];
                                                     return st && st.status && st.status !== 'unanswered';
                                                 });
+                                                if (!allAnswered) return null;
                                                 const kwId = selectedContext.keyword?.id;
-                                                const isAlreadyDone = kwId && completedKeywords.has(kwId);
-                                                if (!allAnswered || isAlreadyDone) return null;
+                                                const isSmartPick = kwId === '_smartpick_';
+                                                const isAlreadyDone = !isSmartPick && kwId && completedKeywords.has(kwId);
+                                                if (isAlreadyDone) return null;
                                                 return (
                                                     <div className="mt-8 text-center animate-fade-in">
                                                         <div className="inline-block bg-gradient-to-r from-teal-50 to-emerald-50 rounded-2xl border border-teal-200 p-6 max-w-md">
-                                                            <div className="text-3xl mb-2">🎯</div>
-                                                            <p className="text-sm font-bold text-teal-800 mb-1">本知識點的所有題目已作答完畢！</p>
-                                                            <p className="text-xs text-slate-500 mb-4">{selectedContext.keyword?.word} — 共 {selectedQuestions.length} 題</p>
+                                                            <div className="text-3xl mb-2">{isSmartPick ? '🎉' : '🎯'}</div>
+                                                            <p className="text-sm font-bold text-teal-800 mb-1">{isSmartPick ? '智慧選題全部完成！' : '本知識點的所有題目已作答完畢！'}</p>
+                                                            <p className="text-xs text-slate-500 mb-4">{isSmartPick ? `共 ${selectedQuestions.length} 題` : `${selectedContext.keyword?.word} — 共 ${selectedQuestions.length} 題`}</p>
                                                             <button onClick={() => {
-                                                                if (kwId) toggleKw(kwId);
+                                                                if (isSmartPick) { setSmartPickQuestions([]); setSmartPickMeta(null); localStorage.removeItem(`medtutor_smartpick_${userId}`); }
+                                                                else if (kwId) toggleKw(kwId);
                                                                 setActiveTab('graph');
                                                             }} className="px-6 py-2.5 rounded-xl text-sm font-bold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">
-                                                                ✅ 標記完成，返回知識圖譜
+                                                                {isSmartPick ? '✅ 返回知識圖譜' : '✅ 標記完成，返回知識圖譜'}
                                                             </button>
                                                         </div>
                                                     </div>
