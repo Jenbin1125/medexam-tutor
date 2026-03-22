@@ -1300,7 +1300,7 @@
                         const core = extractCoreState(qStates);
                         await supabase.from('user_progress').upsert({
                             user_id: userId,
-                            session_state: { ...core, _confirmedMastered: extractConfirmedMastered() },
+                            session_state: { ...core, _confirmedMastered: extractConfirmedMastered(), _userEmail: session?.user?.email || '' },
                             updated_at: new Date().toISOString()
                         }, { onConflict: 'user_id' });
                         console.log('[Sync] qStates → Supabase ✓', Object.keys(core).length, '題');
@@ -1348,9 +1348,10 @@
 
                     // 載入國考日期
                     try {
-                        const { data: cfg } = await supabase.from('system_config').select('value').eq('key', 'exam_date').maybeSingle();
-                        if (cfg?.value) setExamDate(cfg.value);
-                    } catch(e) { /* system_config 表尚未建立時不報錯 */ }
+                        const { data: cfg, error: cfgErr } = await supabase.from('system_config').select('value').eq('key', 'exam_date').maybeSingle();
+                        if (cfgErr) console.warn('[Config] 載入國考日期失敗:', cfgErr.message);
+                        else if (cfg?.value) setExamDate(cfg.value);
+                    } catch(e) { console.warn('[Config] system_config 表可能尚未建立:', e.message); }
                 })();
             }, [userId]);
 
@@ -1501,11 +1502,6 @@
             const loadClassData = async () => {
                 setClassLoading(true);
                 try {
-                    // 先確保 adminEmails 已載入（含 user_id 和 email 映射）
-                    const { data: emailStats } = await supabase.rpc('get_admin_user_stats');
-                    const emailMap = new Map();
-                    if (emailStats) emailStats.forEach(ae => { if (ae.user_id) emailMap.set(ae.user_id, ae.email); });
-
                     const { data: progs } = await supabase.from('user_progress').select('user_id, session_state, updated_at');
                     if (progs) {
                         const stats = progs.filter(p => p.session_state && Object.keys(p.session_state).length > 1).map(p => {
@@ -1520,7 +1516,7 @@
                                 else if (v.status==='incorrect' && v.confidence==='guess') blank++;
                             });
                             const cm = Array.isArray(ss._confirmedMastered) ? ss._confirmedMastered.length : 0;
-                            const fullEmail = emailMap.get(p.user_id) || '';
+                            const fullEmail = ss._userEmail || '';
                             const displayName = fullEmail ? fullEmail.split('@')[0] : p.user_id.slice(0,8);
                             return { user_id: p.user_id, email: displayName, total_answered: total, mastered, lucky, myth, blank, last_answered: p.updated_at, confirmed_mastered_count: cm };
                         });
