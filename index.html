@@ -1095,7 +1095,7 @@
             const [loadingStarred, setLoadingStarred] = React.useState(false);
             const [reviewPage, setReviewPage] = React.useState(0);
             const [reviewFilter, setReviewFilter] = React.useState('today');
-            const [starredDisplayMode, setStarredDisplayMode] = React.useState('hide_answer');
+            const [starredDisplayMode, setStarredDisplayMode] = React.useState('show_answer');
             const [confirmedMastered, setConfirmedMastered] = React.useState(() => {
                 try { const s = localStorage.getItem(`medtutor_confirmed_${userId}`); return s ? new Set(JSON.parse(s)) : new Set(); } catch { return new Set(); }
             });
@@ -1345,10 +1345,14 @@
             }, [qStates]);
 
             // ── 載入複習題目 ──
-            // 記錄目前複習頁面載入時的 UID 快照（避免答題後觸發重新載入）
             const reviewSnapshotRef = React.useRef(null);
+            const reviewLoadedRef = React.useRef(false);
             React.useEffect(() => {
-                if (activeTab !== 'review') return;
+                if (activeTab !== 'review') { reviewLoadedRef.current = false; return; }
+                // 防止同一個 filter 內重複載入（多輪作答不會觸發重新載入）
+                const filterKey = `${activeTab}_${reviewFilter}`;
+                if (reviewLoadedRef.current === filterKey) return;
+                reviewLoadedRef.current = filterKey;
                 setReviewPage(0);
 
                 // 取得當前 filter 的 UIDs
@@ -1387,6 +1391,9 @@
                     } catch (e) { console.error(e); } finally { setLoadingReview(false); }
                 })();
             }, [activeTab, reviewFilter]);
+
+            // 切換 filter 時重置載入守衛
+            React.useEffect(() => { reviewLoadedRef.current = false; }, [reviewFilter]);
 
             // ── 1. 改用我們剛寫好的 RPC 函數撈取進階資料 ──
             const loadAdminEmails = async () => {
@@ -1611,14 +1618,34 @@
 
                                 {/* ── 答題結果 + 四象限標籤 ── */}
                                 {st.answerSelected && !st.pendingConfidence && !st.showExpl && (
-                                    <div className="flex items-center gap-3 mb-4 animate-fade-in flex-wrap">
-                                        {st.status === 'correct' ? <span className="text-green-600 font-bold text-lg flex items-center gap-1"><Icons.Check className="w-5 h-5" />答對了！</span> : <span className="text-red-500 font-bold text-lg">答錯囉，正確答案是 {officialAns}</span>}
-                                        {st.confidence && (() => {
-                                            const qk = getQuadrant(st.status, st.confidence);
-                                            const ql = qk ? Q_LABELS[qk] : null;
-                                            return ql ? <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${ql.cls}`}>{ql.label}</span> : null;
-                                        })()}
-                                        <button onClick={() => handleShowAI(q.uid)} className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-teal-600 text-white font-semibold rounded-xl transition-all shadow-sm ml-auto"><Icons.Brain /> 觀看 AI 導師解析</button>
+                                    <div className="animate-fade-in mb-4">
+                                        <div className="flex items-center gap-3 flex-wrap">
+                                            {st.status === 'correct' ? <span className="text-green-600 font-bold text-lg flex items-center gap-1"><Icons.Check className="w-5 h-5" />答對了！</span> : <span className="text-red-500 font-bold text-lg">答錯囉，正確答案是 {officialAns}</span>}
+                                            {st.confidence && (() => {
+                                                const qk = getQuadrant(st.status, st.confidence);
+                                                const ql = qk ? Q_LABELS[qk] : null;
+                                                return ql ? <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${ql.cls}`}>{ql.label}</span> : null;
+                                            })()}
+                                            <button onClick={() => handleShowAI(q.uid)} className="flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-teal-600 text-white font-semibold rounded-xl transition-all shadow-sm ml-auto"><Icons.Brain /> 觀看 AI 導師解析</button>
+                                        </div>
+                                        {/* 真懂慶祝 — 在複習模式下答對+確定時顯示 */}
+                                        {isReview && st.status === 'correct' && st.confidence === 'sure' && (
+                                            <div className="mt-3 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 animate-fade-in">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-2xl">🎉</span>
+                                                    <div className="flex-1">
+                                                        <p className="text-sm font-bold text-emerald-700">太棒了！這題已經真正掌握了！</p>
+                                                        <p className="text-xs text-emerald-600/70 mt-0.5">答對 + 確定 = 真懂。這個知識點已經內化，考場上能穩定輸出。</p>
+                                                    </div>
+                                                    <button onClick={() => {
+                                                        setConfirmedMastered(p => { const n = new Set(p); n.add(q.uid); return n; });
+                                                        setReviewQuestions(prev => prev.filter(rq => rq.uid !== q.uid));
+                                                    }} className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-all shadow-sm">
+                                                        ✅ 已精熟，移出複習
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                                 {!st.answerSelected && !st.showExpl && <button onClick={() => handleShowAI(q.uid)} className="text-slate-400 hover:text-teal-600 text-sm font-bold underline transition-colors">跳過作答，直接看詳解</button>}
@@ -1942,7 +1969,6 @@
                                                 <div className="flex flex-wrap items-center gap-3">
                                                     <span className="text-xs font-bold text-slate-500">顯示方式：</span>
                                                     {[
-                                                        { id: 'hide_answer', label: '只顯示題目（重新作答）' },
                                                         { id: 'show_answer', label: '顯示題目 + 答案' },
                                                         { id: 'show_l3', label: '顯示答案 + Level 3 解析' },
                                                         { id: 'show_all', label: '顯示全部解析' },
@@ -1990,9 +2016,7 @@
                                                         let renderMode = 'review';
                                                         if (reviewFilter === 'starred') {
                                                             renderMode = 'review-starred';
-                                                            if (starredDisplayMode === 'hide_answer') {
-                                                                renderSt = { answerSelected: null, status: 'unanswered', openStates: [false, false, false], showExpl: false, confidence: null, pendingConfidence: false };
-                                                            } else if (starredDisplayMode === 'show_answer') {
+                                                            if (starredDisplayMode === 'show_answer') {
                                                                 renderSt = st.answerSelected ? { ...st, showExpl: false, openStates: [false, false, false] } : st;
                                                             } else if (starredDisplayMode === 'show_l3') {
                                                                 renderSt = st.answerSelected ? { ...st, showExpl: true, openStates: [false, false, true] } : st;
