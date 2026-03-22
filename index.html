@@ -1893,6 +1893,93 @@
                                     </table>
                                 </div>
                             </div>
+
+                            {/* 全班學習概覽 */}
+                            <div className="bg-sky-50 border border-sky-200 rounded-2xl p-6 animate-fade-in">
+                                <h2 className="font-bold text-sky-800 mb-4 flex items-center gap-2"><Icons.Target /> 全班學習概覽</h2>
+                                {(() => {
+                                    const [classData, setClassData] = React.useState([]);
+                                    const [classLoading, setClassLoading] = React.useState(false);
+                                    const loadClass = async () => {
+                                        setClassLoading(true);
+                                        try {
+                                            // 直接從 user_progress 讀取 session_state
+                                            const { data: progs } = await supabase.from('user_progress').select('user_id, session_state, updated_at');
+                                            if (progs) {
+                                                // 取得 email 對應
+                                                const { data: emails } = await supabase.from('allowed_emails').select('email');
+                                                const { data: auths } = await supabase.rpc('get_admin_user_stats').catch(() => ({ data: null }));
+                                                const emailMap = {};
+                                                if (auths) auths.forEach(a => { emailMap[a.email] = true; });
+
+                                                const stats = progs.filter(p => p.session_state && Object.keys(p.session_state).length > 1).map(p => {
+                                                    const ss = p.session_state;
+                                                    let mastered=0, lucky=0, myth=0, blank=0, total=0;
+                                                    Object.entries(ss).forEach(([k, v]) => {
+                                                        if (k.startsWith('_') || !v?.confidence) return;
+                                                        total++;
+                                                        if (v.status==='correct' && v.confidence==='sure') mastered++;
+                                                        else if (v.status==='correct' && v.confidence==='guess') lucky++;
+                                                        else if (v.status==='incorrect' && v.confidence==='sure') myth++;
+                                                        else if (v.status==='incorrect' && v.confidence==='guess') blank++;
+                                                    });
+                                                    const cm = Array.isArray(ss._confirmedMastered) ? ss._confirmedMastered.length : 0;
+                                                    // 嘗試從 adminEmails 匹配 email
+                                                    const matchedEmail = adminEmails.find(ae => ae.user_id === p.user_id);
+                                                    return { user_id: p.user_id, email: matchedEmail?.email || p.user_id.slice(0,8)+'...', total_answered: total, mastered, lucky, myth, blank, last_answered: p.updated_at, confirmed_mastered_count: cm };
+                                                });
+                                                setClassData(stats.filter(s => s.total_answered > 0));
+                                            }
+                                        } catch(e) { console.error(e); } finally { setClassLoading(false); }
+                                    };
+                                    React.useEffect(() => { loadClass(); }, []);
+                                    const QC = { mastered: '#10b981', lucky: '#f59e0b', myth: '#ef4444', blank: '#818cf8' };
+
+                                    return (<>
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className="text-xs text-sky-600 font-bold">共 {classData.length} 位學生有學習紀錄</span>
+                                            <button onClick={loadClass} disabled={classLoading} className="text-xs text-sky-600 hover:text-sky-800 font-bold flex items-center gap-1">
+                                                {classLoading ? <Icons.Loader2 className="w-3 h-3" /> : <Icons.RotateCcw className="w-3 h-3" />} 重新整理
+                                            </button>
+                                        </div>
+                                        {classData.length === 0 ? (
+                                            <p className="text-sm text-slate-400 text-center py-4">{classLoading ? '載入中...' : '尚無學生學習紀錄'}</p>
+                                        ) : (
+                                            <div className="max-h-96 overflow-y-auto border border-sky-200 rounded-xl bg-white shadow-inner">
+                                                <table className="w-full text-left text-xs whitespace-nowrap">
+                                                    <thead className="sticky top-0 bg-sky-50 shadow-sm z-10">
+                                                        <tr className="text-sky-800">
+                                                            <th className="px-3 py-2.5 font-bold border-b border-sky-200">學生</th>
+                                                            <th className="px-3 py-2.5 font-bold text-center border-b border-sky-200">已答</th>
+                                                            <th className="px-3 py-2.5 font-bold border-b border-sky-200 w-40">四象限分佈</th>
+                                                            <th className="px-3 py-2.5 font-bold text-center border-b border-sky-200">真懂率</th>
+                                                            <th className="px-3 py-2.5 font-bold text-center border-b border-sky-200">精熟</th>
+                                                            <th className="px-3 py-2.5 font-bold border-b border-sky-200">最後活動</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-sky-50">
+                                                        {classData.sort((a,b) => b.total_answered - a.total_answered).map(s => {
+                                                            const tot = s.total_answered || 1;
+                                                            const mPct = Math.round((s.mastered / tot) * 100);
+                                                            return (
+                                                                <tr key={s.user_id} className="hover:bg-sky-50/50 transition-colors">
+                                                                    <td className="px-3 py-2.5 font-mono text-slate-600 text-[11px] max-w-[140px] truncate">{s.email}</td>
+                                                                    <td className="px-3 py-2.5 text-center font-bold text-slate-700">{s.total_answered}</td>
+                                                                    <td className="px-3 py-2.5"><div className="flex h-3.5 rounded-md overflow-hidden bg-slate-100">{['mastered','lucky','myth','blank'].map(k => { const pct=(s[k]/tot)*100; return pct>0 ? <div key={k} style={{width:`${pct}%`,background:QC[k],opacity:0.85}} title={`${k}: ${s[k]}`}/> : null; })}</div></td>
+                                                                    <td className={`px-3 py-2.5 text-center font-black ${mPct>=60?'text-emerald-600':mPct>=30?'text-amber-500':'text-red-500'}`}>{mPct}%</td>
+                                                                    <td className="px-3 py-2.5 text-center text-slate-500">{s.confirmed_mastered_count}</td>
+                                                                    <td className="px-3 py-2.5 text-slate-400 text-[10px] font-mono">{s.last_answered ? new Date(s.last_answered).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}) : '-'}</td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </>);
+                                })()}
+                            </div>
+
                         </div>
                     )}
 
@@ -2355,6 +2442,50 @@
                                             <h2 className="text-xl font-black text-slate-800 tracking-tight mb-0.5">學習進度儀表板</h2>
                                             <p className="text-xs text-slate-400">基於信心評估的四象限分析 · 已作答 {totalAnswered} 題</p>
                                         </div>
+
+                                        {/* 系統使用指南 */}
+                                        <details className="bg-white rounded-2xl border border-slate-200 p-5">
+                                            <summary className="cursor-pointer text-sm font-bold text-slate-500 hover:text-teal-600 transition-colors flex items-center gap-2">📖 系統使用指南 — 如何高效備考？</summary>
+                                            <div className="mt-4 space-y-4 text-sm text-slate-600 leading-relaxed">
+                                                <div>
+                                                    <h4 className="font-bold text-teal-700 mb-2">🗺️ 第一步：知識圖譜 — 選題做題</h4>
+                                                    <p className="text-xs text-slate-500 leading-relaxed">知識圖譜將 7,039 題依 19 大科、1,775 個知識點分類。每個知識點標有 🔥重要 / ⭐熱門 / 一般 / 冷門 四個等級。</p>
+                                                    <div className="mt-2 bg-teal-50 rounded-lg p-3 border border-teal-100">
+                                                        <p className="text-xs text-teal-700 font-bold mb-1">建議流程：</p>
+                                                        <p className="text-[11px] text-slate-500">① 展開「🎯 智慧選題指南」→ 點擊「智慧選題」自動產生 20 題，或自行選擇知識點做題。</p>
+                                                        <p className="text-[11px] text-slate-500">② 優先完成 🔥重要考點（歷年高頻），再推進 ⭐熱門考點。</p>
+                                                        <p className="text-[11px] text-slate-500">③ 做完一個知識點的所有題目後，點擊「✅ 標記完成，返回知識圖譜」自動打勾。</p>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-sky-700 mb-2">📝 第二步：導師解析 — 答題 + 信心評估</h4>
+                                                    <p className="text-xs text-slate-500 leading-relaxed">每題作答後需進行信心評估（「💪 我很確定」或「🤔 我在猜」），系統根據答對/答錯 × 確定/猜的，將每題歸入四象限：</p>
+                                                    <div className="grid grid-cols-2 gap-1.5 mt-2 text-[11px]">
+                                                        <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-100"><strong className="text-emerald-700">🟢 真懂</strong> = 答對+確定 → 已內化</div>
+                                                        <div className="bg-amber-50 rounded-lg p-2 border border-amber-100"><strong className="text-amber-700">🟡 運氣</strong> = 答對+猜的 → 需鞏固</div>
+                                                        <div className="bg-red-50 rounded-lg p-2 border border-red-100"><strong className="text-red-700">🔴 危險迷思</strong> = 答錯+確定 → 最危險</div>
+                                                        <div className="bg-indigo-50 rounded-lg p-2 border border-indigo-100"><strong className="text-indigo-700">🟣 知識空白</strong> = 答錯+猜的 → 需補強</div>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-amber-700 mb-2">🔄 第三步：智慧複習 — 間隔排程自動推薦</h4>
+                                                    <p className="text-xs text-slate-500 leading-relaxed">系統根據四象限狀態和作答時間，自動計算下次複習日期：</p>
+                                                    <div className="mt-2 bg-amber-50 rounded-lg p-3 border border-amber-100 text-[11px]">
+                                                        <p className="text-slate-500">🔴 危險迷思 → <strong className="text-red-600">3 天</strong>後推薦 · 🟣 知識空白 → <strong className="text-indigo-600">5 天</strong>後 · 🟡 運氣 → <strong className="text-amber-600">7 天</strong>後 · 🟢 真懂 → <strong className="text-emerald-600">30 天</strong>後</p>
+                                                        <p className="text-slate-500 mt-1">到期題目出現在「📋 今日複習」→ 重新作答 → 答對+確定 → 點「✅ 已精熟」移出複習閉環。</p>
+                                                        <p className="text-slate-500 mt-1">⭐ 手動收藏：在 AI 解析後點擊「手動收藏複習」，可隨時在「⭐ 手動收藏」中回顧。</p>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-purple-700 mb-2">📊 第四步：儀表板 — 追蹤進度</h4>
+                                                    <p className="text-xs text-slate-500 leading-relaxed">儀表板即時反映學習狀態：四象限圓環圖、信心校準度、各科覆蓋率與真懂率、備考階段策略建議。目標是讓越來越多題目從 🔴🟣🟡 推進到 🟢 真懂。</p>
+                                                </div>
+                                                <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                                                    <p className="text-xs font-bold text-slate-600 mb-1">💡 每日備考建議</p>
+                                                    <p className="text-[11px] text-slate-500">① 先做「📋 今日複習」中的到期題目（約 10-15 分鐘）→ ② 再用「🎯 智慧選題」做新題（約 30-40 分鐘）→ ③ 看儀表板的進度變化。持續 2-3 週就能明顯感受到進步。</p>
+                                                </div>
+                                            </div>
+                                        </details>
 
                                         {/* 信心引導 */}
                                         <details className="bg-white rounded-2xl border border-slate-200 p-5">
