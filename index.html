@@ -1960,6 +1960,32 @@
                                             <div className="space-y-8">
                                                 {selectedQuestions.map((q, idx) => renderQuestion(q, idx, qStates[q.uid]))}
                                             </div>
+
+                                            {/* ── 本知識點已完成按鈕 ── */}
+                                            {(() => {
+                                                const allAnswered = selectedQuestions.length > 0 && selectedQuestions.every(q => {
+                                                    const st = qStates[q.uid];
+                                                    return st && st.status && st.status !== 'unanswered';
+                                                });
+                                                const kwId = selectedContext.keyword?.id;
+                                                const isAlreadyDone = kwId && completedKeywords.has(kwId);
+                                                if (!allAnswered || isAlreadyDone) return null;
+                                                return (
+                                                    <div className="mt-8 text-center animate-fade-in">
+                                                        <div className="inline-block bg-gradient-to-r from-teal-50 to-emerald-50 rounded-2xl border border-teal-200 p-6 max-w-md">
+                                                            <div className="text-3xl mb-2">🎯</div>
+                                                            <p className="text-sm font-bold text-teal-800 mb-1">本知識點的所有題目已作答完畢！</p>
+                                                            <p className="text-xs text-slate-500 mb-4">{selectedContext.keyword?.word} — 共 {selectedQuestions.length} 題</p>
+                                                            <button onClick={() => {
+                                                                if (kwId) toggleKw(kwId);
+                                                                setActiveTab('graph');
+                                                            }} className="px-6 py-2.5 rounded-xl text-sm font-bold bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">
+                                                                ✅ 標記完成，返回知識圖譜
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     )}
                                 </div>
