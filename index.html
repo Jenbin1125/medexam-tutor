@@ -1501,6 +1501,11 @@
             const loadClassData = async () => {
                 setClassLoading(true);
                 try {
+                    // 先確保 adminEmails 已載入（含 user_id 和 email 映射）
+                    const { data: emailStats } = await supabase.rpc('get_admin_user_stats');
+                    const emailMap = new Map();
+                    if (emailStats) emailStats.forEach(ae => { if (ae.user_id) emailMap.set(ae.user_id, ae.email); });
+
                     const { data: progs } = await supabase.from('user_progress').select('user_id, session_state, updated_at');
                     if (progs) {
                         const stats = progs.filter(p => p.session_state && Object.keys(p.session_state).length > 1).map(p => {
@@ -1515,8 +1520,9 @@
                                 else if (v.status==='incorrect' && v.confidence==='guess') blank++;
                             });
                             const cm = Array.isArray(ss._confirmedMastered) ? ss._confirmedMastered.length : 0;
-                            const matchedEmail = adminEmails.find(ae => ae.user_id === p.user_id);
-                            return { user_id: p.user_id, email: matchedEmail?.email || p.user_id.slice(0,8)+'...', total_answered: total, mastered, lucky, myth, blank, last_answered: p.updated_at, confirmed_mastered_count: cm };
+                            const fullEmail = emailMap.get(p.user_id) || '';
+                            const displayName = fullEmail ? fullEmail.split('@')[0] : p.user_id.slice(0,8);
+                            return { user_id: p.user_id, email: displayName, total_answered: total, mastered, lucky, myth, blank, last_answered: p.updated_at, confirmed_mastered_count: cm };
                         });
                         setClassData(stats.filter(s => s.total_answered > 0));
                     }
