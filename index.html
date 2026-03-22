@@ -1369,6 +1369,20 @@
             React.useEffect(() => {
                 if (activeTab === 'review') {
                     setReviewPage(0);
+                    // 危險迷思/知識空白/運氣：重置 qStates 讓題目可重新作答
+                    if (['myth', 'blank', 'lucky'].includes(reviewFilter)) {
+                        const uidsToReset = (reviewCategories[reviewFilter] || []).map(t => t.uid);
+                        if (uidsToReset.length > 0) {
+                            setQStates(prev => {
+                                const next = { ...prev };
+                                uidsToReset.forEach(uid => {
+                                    // 保留核心歷史欄位，只重置答題 UI 狀態
+                                    next[uid] = { ...next[uid], answerSelected: null, status: 'unanswered', openStates: [false, false, false], showExpl: false, pendingConfidence: false };
+                                });
+                                return next;
+                            });
+                        }
+                    }
                     loadReviewQuestions(reviewFilter);
                 }
             }, [activeTab, reviewFilter, reviewCategories, starredUids]);
@@ -1961,7 +1975,7 @@
 
                                                                     </div>
                                                                 )}
-                                                                {renderQuestion(q, safePage * REVIEW_PAGE_SIZE + idx, (['myth','blank','lucky'].includes(reviewFilter)) ? { answerSelected: null, status: 'unanswered', openStates: [false, false, false], showExpl: false, confidence: null, pendingConfidence: false } : (st.answerSelected ? st : { answerSelected: null, status: 'unanswered', openStates: [false, false, false], showExpl: false, confidence: null, pendingConfidence: false }), reviewFilter === 'starred' ? 'review-starred' : 'review')}
+                                                                {renderQuestion(q, safePage * REVIEW_PAGE_SIZE + idx, qStates[q.uid] || { answerSelected: null, status: 'unanswered', openStates: [false, false, false], showExpl: false, confidence: null, pendingConfidence: false }, reviewFilter === 'starred' ? 'review-starred' : 'review')}
                                                             </div>
                                                         );
                                                     })}
