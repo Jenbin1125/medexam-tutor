@@ -1045,6 +1045,38 @@
                     return parsed || { subject: '', sub: '', category: '', keyword: null };
                 } catch { return { subject: '', sub: '', category: '', keyword: null }; }
             });
+            // ── qStates 核心欄位提取（同步用，去除 UI 暫態） ──
+            const extractCoreState = (states) => {
+                const core = {};
+                Object.entries(states).forEach(([uid, s]) => {
+                    if (!s || (s.status === 'unanswered' && !s.showExpl)) return;
+                    core[uid] = {};
+                    if (s.answerSelected) core[uid].answerSelected = s.answerSelected;
+                    if (s.status && s.status !== 'unanswered') core[uid].status = s.status;
+                    if (s.confidence) core[uid].confidence = s.confidence;
+                    if (s.answeredAt) core[uid].answeredAt = s.answeredAt;
+                    if (s.dept) core[uid].dept = s.dept;
+                });
+                return core;
+            };
+
+            // ── qStates 智慧合併（按 answeredAt 取較新者） ──
+            const mergeQStates = (local, cloud) => {
+                const merged = { ...local };
+                Object.entries(cloud).forEach(([uid, cloudState]) => {
+                    const localState = merged[uid];
+                    if (!localState) {
+                        // 本地沒有，雲端有 → 用雲端的
+                        merged[uid] = { ...cloudState, openStates: [true, false, false], showExpl: false, pendingConfidence: false };
+                    } else if (cloudState.answeredAt && (!localState.answeredAt || cloudState.answeredAt > localState.answeredAt)) {
+                        // 雲端的比較新 → 用雲端的核心欄位，保留本地 UI 狀態
+                        merged[uid] = { ...localState, ...cloudState };
+                    }
+                    // 否則本地的比較新或一樣 → 保留本地的（不動）
+                });
+                return merged;
+            };
+
             const [qStates, setQStates] = React.useState(() => {
                 try {
                     const saved = localStorage.getItem(`medtutor_qStates_${userId}`);
@@ -1052,6 +1084,7 @@
                     return parsed || {};
                 } catch { return {}; }
             });
+            const [qStatesSynced, setQStatesSynced] = React.useState(false);
 
             const [searchQuery, setSearchQuery] = React.useState('');
             const [completedKeywords, setCompletedKeywords] = React.useState(new Set());
@@ -1136,24 +1169,58 @@
                 }
             }, [selectedContext, userId]);
 
+            // ── qStates 儲存：localStorage 即時 + Supabase 防抖同步 ──
+            const qStatesSyncRef = React.useRef(null);
             React.useEffect(() => {
-                if (userId && qStates && Object.keys(qStates).length > 0) {
+                if (!userId || !qStates || Object.keys(qStates).length === 0) return;
+                try {
+                    // 1. 立即寫入 localStorage（毫秒級回應）
+                    const stateToSave = Object.entries(qStates).reduce((acc, [uid, state]) => {
+                        if (state && (state.status !== 'unanswered' || state.showExpl)) { acc[uid] = state; }
+                        return acc;
+                    }, {});
+                    localStorage.setItem(`medtutor_qStates_${userId}`, JSON.stringify(stateToSave));
+                } catch (e) { console.error("儲存 qStates 到 localStorage 失敗:", e); }
+
+                // 2. 防抖 5 秒後同步到 Supabase（只存核心欄位）
+                if (qStatesSyncRef.current) clearTimeout(qStatesSyncRef.current);
+                qStatesSyncRef.current = setTimeout(async () => {
                     try {
-                        const stateToSave = Object.entries(qStates).reduce((acc, [uid, state]) => {
-                            if (state && (state.status !== 'unanswered' || state.showExpl)) { acc[uid] = state; }
-                            return acc;
-                        }, {});
-                        localStorage.setItem(`medtutor_qStates_${userId}`, JSON.stringify(stateToSave));
-                    } catch (e) { console.error("儲存 qStates 失敗:", e); }
-                }
+                        const core = extractCoreState(qStates);
+                        await supabase.from('user_progress').upsert({
+                            user_id: userId,
+                            session_state: core,
+                            updated_at: new Date().toISOString()
+                        }, { onConflict: 'user_id' });
+                        console.log('[Sync] qStates → Supabase ✓', Object.keys(core).length, '題');
+                    } catch (e) { console.error('[Sync] qStates → Supabase 失敗:', e); }
+                }, 5000);
+                return () => { if (qStatesSyncRef.current) clearTimeout(qStatesSyncRef.current); };
             }, [qStates, userId]);
 
             // ── Supabase 資料載入 ──
             React.useEffect(() => {
                 if (!userId) return;
                 (async () => {
-                    const { data: prog } = await supabase.from('user_progress').select('completed_keywords').eq('user_id', userId).maybeSingle();
+                    const { data: prog } = await supabase.from('user_progress').select('completed_keywords, session_state').eq('user_id', userId).maybeSingle();
                     if (prog?.completed_keywords) setCompletedKeywords(new Set(prog.completed_keywords));
+
+                    // 背景合併雲端 qStates
+                    if (prog?.session_state && typeof prog.session_state === 'object' && Object.keys(prog.session_state).length > 0) {
+                        setQStates(prevLocal => {
+                            const merged = mergeQStates(prevLocal, prog.session_state);
+                            const localCount = Object.keys(prevLocal).filter(k => prevLocal[k]?.answeredAt).length;
+                            const cloudCount = Object.keys(prog.session_state).length;
+                            const mergedCount = Object.keys(merged).filter(k => merged[k]?.answeredAt).length;
+                            if (mergedCount > localCount) {
+                                console.log(`[Sync] 雲端合併：本地 ${localCount} 題 + 雲端 ${cloudCount} 題 → 合併後 ${mergedCount} 題`);
+                                // 同步更新 localStorage
+                                try { localStorage.setItem(`medtutor_qStates_${userId}`, JSON.stringify(merged)); } catch(e) {}
+                            }
+                            return merged;
+                        });
+                    }
+                    setQStatesSynced(true);
 
                     const { data: stars } = await supabase.from('user_starred').select('question_uid').eq('user_id', userId);
                     if (stars) setStarredUids(new Set(stars.map(s => s.question_uid)));
@@ -1332,15 +1399,22 @@
 
             // ── 重置本地記憶與測驗狀態 ──
             const handleResetLocalMemory = () => {
-                const confirmMsg = "確定要清除所有「本地記憶」嗎？\n\n這將會重置您所有的單題對錯與解析展開紀錄。\n（請放心：您的「考前複習」收藏與「圖譜單元打勾」進度已安全備份至資料庫，不會被清除）";
+                const confirmMsg = "確定要清除所有「作答紀錄」嗎？\n\n這將會重置您所有的答題狀態與信心評估紀錄（含雲端備份）。\n（請放心：您的「考前複習」收藏與「圖譜單元打勾」進度不會被清除）";
 
                 if (window.confirm(confirmMsg)) {
-                    // 1. 清除瀏覽器 LocalStorage 的綁定紀錄
+                    // 1. 清除瀏覽器 LocalStorage
                     localStorage.removeItem(`medtutor_tab_${userId}`);
                     localStorage.removeItem(`medtutor_context_${userId}`);
                     localStorage.removeItem(`medtutor_qStates_${userId}`);
 
-                    // 2. 重新初始化前端目前的作答狀態 (讓畫面即時更新為未作答，不需重新整理網頁)
+                    // 2. 清除 Supabase 雲端的 session_state
+                    supabase.from('user_progress').upsert({
+                        user_id: userId,
+                        session_state: {},
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'user_id' }).then(() => console.log('[Sync] 雲端 session_state 已清除')).catch(e => console.error(e));
+
+                    // 3. 重新初始化前端作答狀態
                     setQStates(prev => {
                         const reset = {};
                         selectedQuestions.forEach(q => {
