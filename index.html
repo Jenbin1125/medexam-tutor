@@ -1414,8 +1414,9 @@
             // ── 智慧複習：計算各分類的 UIDs ──
             const reviewCategories = React.useMemo(() => {
                 const now = Date.now();
-                const PRIORITY = { myth: 0, lucky: 1, blank: 2 };
-                const categories = { myth: [], blank: [], lucky: [], mastered: [], wrongReview: [] };
+                const INTERVALS = { myth: 3, blank: 5, lucky: 7, mastered: 30 };
+                const PRIORITY = { myth: 0, lucky: 1, blank: 2, mastered: 3 };
+                const categories = { myth: [], blank: [], lucky: [], mastered: [], today: [] };
 
                 Object.entries(qStates).forEach(([uid, s]) => {
                     if (!s || !s.confidence || s.status === 'unanswered') return;
@@ -1423,20 +1424,18 @@
                     if (!qk) return;
                     categories[qk].push({ uid, answeredAt: s.answeredAt || 0, quadrant: qk });
 
-                    // 錯題複習：所有非真懂的題目（危險迷思/運氣/知識空白）
-                    if (qk !== 'mastered') {
-                        // 24小時內已作答的題目不重複推薦
-                        const hoursSince = s.answeredAt ? (now - s.answeredAt) / 3600000 : 999;
-                        if (hoursSince >= 24) {
-                            categories.wrongReview.push({ uid, answeredAt: s.answeredAt || 0, quadrant: qk, priority: PRIORITY[qk] ?? 3 });
-                        }
+                    // 計算是否到期（需要複習）
+                    const daysSince = s.answeredAt ? (now - s.answeredAt) / 86400000 : 999;
+                    if (daysSince >= INTERVALS[qk]) {
+                        categories.today.push({ uid, answeredAt: s.answeredAt || 0, quadrant: qk, priority: PRIORITY[qk] });
                     }
                 });
 
-                // 按優先級排序：危險迷思 > 運氣 > 知識空白
-                categories.wrongReview.sort((a, b) => a.priority - b.priority || a.answeredAt - b.answeredAt);
+                // 排序：危險迷思 > 運氣 > 知識空白 > 真懂，同優先級按 answeredAt 舊的優先
+                categories.today.sort((a, b) => a.priority - b.priority || a.answeredAt - b.answeredAt);
                 // 排除已確認精熟的題目
-                categories.wrongReview = categories.wrongReview.filter(t => !confirmedMastered.has(t.uid));
+                categories.today = categories.today.filter(t => !confirmedMastered.has(t.uid));
+                categories.mastered = categories.mastered.filter(t => !confirmedMastered.has(t.uid));
 
                 return categories;
             }, [qStates]);
@@ -1457,7 +1456,7 @@
                 if (reviewFilter === 'starred') {
                     uids = [...starredUids];
                 } else if (reviewFilter === 'today') {
-                    uids = reviewCategories.wrongReview.map(t => t.uid);
+                    uids = reviewCategories.today.map(t => t.uid);
                 } else {
                     uids = (reviewCategories[reviewFilter] || []).map(t => t.uid);
                 }
@@ -1745,7 +1744,7 @@
                                         {/* 複習後仍答錯 — 溫和鼓勵 */}
                                         {isReview && mode !== 'review-starred' && st.status === 'incorrect' && st.confidence && (
                                             <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200 animate-fade-in">
-                                                <p className="text-xs text-slate-500 leading-relaxed">💪 沒關係，這題會在 24 小時後再次出現在錯題複習中。先看看 AI 解析，下次一定能答對！</p>
+                                                <p className="text-xs text-slate-500 leading-relaxed">💪 沒關係，這題會在幾天後再次出現在複習清單中。每多做一次，記憶就更深一層。</p>
                                             </div>
                                         )}
                                     </div>
@@ -1810,7 +1809,7 @@
                         {/* 第二行：Tab 導航（左） + 每日一語（右） */}
                         <div className="max-w-4xl mx-auto px-4 pb-2 flex items-center justify-between gap-3">
                             <div className="flex gap-1 bg-slate-800 p-1 rounded-xl flex-shrink-0">
-                                {[{ id: 'graph', label: '知識圖譜', icon: <Icons.Network /> }, { id: 'ai-explain', label: '導師解析', icon: <Icons.Brain /> }, { id: 'review', label: '錯題複習', icon: <Icons.BookOpen /> }, { id: 'dashboard', label: '儀表板', icon: <Icons.Target /> }].map(tab => (
+                                {[{ id: 'graph', label: '知識圖譜', icon: <Icons.Network /> }, { id: 'ai-explain', label: '導師解析', icon: <Icons.Brain /> }, { id: 'review', label: '智慧複習', icon: <Icons.BookOpen /> }, { id: 'dashboard', label: '儀表板', icon: <Icons.Target /> }].map(tab => (
                                     <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 ${activeTab === tab.id ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}>
                                         <span className="w-4 h-4 flex items-center justify-center">{tab.icon}</span>
                                         <span className="hidden sm:inline">{tab.label}</span>
@@ -2163,7 +2162,7 @@
                         <div className={activeTab === 'review' ? 'block animate-fade-in' : 'hidden'}>
                             {(() => {
                                 const filters = [
-                                    { id: 'today', label: '📝 錯題複習', count: reviewCategories.wrongReview.length, bg: 'bg-sky-50 border-sky-200 text-sky-700', activeBg: 'bg-sky-600 text-white border-sky-600' },
+                                    { id: 'today', label: '📋 今日複習', count: reviewCategories.today.length, bg: 'bg-sky-50 border-sky-200 text-sky-700', activeBg: 'bg-sky-600 text-white border-sky-600' },
                                     { id: 'starred', label: '⭐ 手動收藏', count: starredUids.size, bg: 'bg-slate-50 border-slate-200 text-slate-600', activeBg: 'bg-slate-700 text-white border-slate-700' },
                                 ];
                                 const activeFilter = filters.find(f => f.id === reviewFilter) || filters[0];
@@ -2173,15 +2172,15 @@
 
                                 return (
                                     <div className="space-y-4">
-                                        {/* 錯題複習進度 */}
-                                        {reviewCategories.wrongReview.length > 0 && reviewFilter === 'today' && (
+                                        {/* 今日複習進度 */}
+                                        {reviewCategories.today.length > 0 && reviewFilter === 'today' && (
                                             <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-4">
-                                                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-50 border-2 border-red-200 flex items-center justify-center">
-                                                    <span className="text-red-600 font-black text-sm">{reviewCategories.wrongReview.length}</span>
+                                                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-sky-50 border-2 border-sky-200 flex items-center justify-center">
+                                                    <span className="text-sky-700 font-black text-sm">{reviewCategories.today.length}</span>
                                                 </div>
                                                 <div className="flex-1">
-                                                    <p className="text-sm font-bold text-slate-700">錯題複習 {reviewCategories.wrongReview.length} 題</p>
-                                                    <p className="text-xs text-slate-400 mt-0.5">所有非「真懂」的題目，依 🔴危險迷思 → 🟡運氣 → 🟣知識空白 排列。重新作答，答對+確定即可移出。</p>
+                                                    <p className="text-sm font-bold text-slate-700">今日建議複習 {reviewCategories.today.length} 題</p>
+                                                    <p className="text-xs text-slate-400 mt-0.5">系統根據間隔排程自動推薦到期的複習題目。複習後狀態會即時更新。</p>
                                                 </div>
                                             </div>
                                         )}
@@ -2198,8 +2197,8 @@
 
                                         {/* 使用說明 */}
                                         {reviewFilter === 'today' && reviewQuestions.length > 0 && (
-                                            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 text-[11px] text-slate-500 leading-relaxed">
-                                                💡 不看之前的答案，憑記憶重新作答。<strong className="text-emerald-600">答對+確定</strong> → 出現「已精熟」按鈕，點擊後移出複習。<strong className="text-red-500">答錯</strong> → 24 小時後再次出現。
+                                            <div className="bg-sky-50 rounded-xl p-3 border border-sky-100 text-[11px] text-slate-500 leading-relaxed">
+                                                💡 系統根據間隔排程推薦到期題目，依 <strong className="text-red-500">🔴 危險迷思（3天）</strong> → <strong className="text-amber-500">🟡 運氣（7天）</strong> → <strong className="text-indigo-500">🟣 知識空白（5天）</strong> 排列。不看之前的答案，憑記憶重新作答。<strong className="text-emerald-600">答對+確定</strong> → 「已精熟」移出複習；<strong className="text-slate-600">答錯</strong> → 根據新狀態重新計算下次到期日。
                                             </div>
                                         )}
                                         {reviewFilter === 'starred' && reviewQuestions.length > 0 && (
@@ -2226,7 +2225,7 @@
                                         ) : reviewQuestions.length === 0 ? (
                                             <div className="text-center p-10 bg-white rounded-2xl border border-slate-200">
                                                 {reviewFilter === 'today' ? (
-                                                    <><div className="text-3xl mb-3">🎉</div><p className="text-slate-500 font-bold">目前沒有需要複習的錯題！</p><p className="text-xs text-slate-400 mt-1">繼續做新題，答錯的題目會自動出現在這裡。已作答但仍答錯的題目需間隔 24 小時後才會再次顯示。</p></>
+                                                    <><div className="text-3xl mb-3">🎉</div><p className="text-slate-500 font-bold">目前沒有到期的複習題目！</p><p className="text-xs text-slate-400 mt-1">所有題目都在間隔期內，繼續做新題或等到期後自動推薦。</p></>
                                                 ) : reviewFilter === 'starred' ? (
                                                     <><Icons.Star filled={false} className="w-10 h-10 mx-auto mb-3 text-slate-300" /><p className="text-slate-500 font-bold">尚未收藏任何考題</p><p className="text-xs text-slate-400 mt-1">在「導師解析」看完 AI 解析後點擊 ⭐ 即可收藏</p></>
                                                 ) : (
