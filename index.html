@@ -1803,7 +1803,7 @@
                         {/* ── 學習儀表板 Tab ── */}
                         <div className={activeTab === 'dashboard' ? 'block animate-fade-in' : 'hidden'}>
                             {(() => {
-                                // 計算四象限統計
+                                // ── 計算四象限統計 ──
                                 const allStates = Object.values(qStates).filter(s => s && s.status && s.status !== 'unanswered' && s.confidence);
                                 const counts = { mastered: 0, lucky: 0, myth: 0, blank: 0 };
                                 allStates.forEach(s => { const qk = getQuadrant(s.status, s.confidence); if (qk) counts[qk]++; });
@@ -1812,41 +1812,32 @@
                                 const sureAnswers = allStates.filter(s => s.confidence === 'sure');
                                 const sureCorrect = sureAnswers.filter(s => s.status === 'correct').length;
                                 const calibrationPct = sureAnswers.length > 0 ? Math.round((sureCorrect / sureAnswers.length) * 100) : 0;
-
-                                // 科別統計（只計算使用者實際點選的知識點所屬科別）
+                                // 本週 / 連續天數
+                                const now = Date.now(), weekAgo = now - 7 * 86400000;
+                                const weekCount = Object.values(qStates).filter(s => s && s.answeredAt && s.answeredAt > weekAgo).length;
+                                const daySet = new Set();
+                                Object.values(qStates).forEach(s => { if (s && s.answeredAt) { const d = new Date(s.answeredAt); daySet.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`); } });
+                                let streak = 0;
+                                for (let i = 0; i < 30; i++) { const d = new Date(now - i * 86400000); if (daySet.has(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`)) streak++; else if (i > 0) break; }
+                                // 科別統計
                                 const deptStats = (() => {
-                                    // 建立 UID → 科別 的精確映射（透過知識圖譜的 keyword.uids）
                                     const uidToDept = new Map();
                                     knowledgeGraphData.forEach(dept => {
-                                        const deptName = dept.name;
-                                        const mapUids = (cats) => {
-                                            cats.forEach(cat => {
-                                                cat.keywords?.forEach(kw => {
-                                                    kw.uids?.forEach(uid => {
-                                                        // 只記錄第一個映射到的科別（避免重複計算）
-                                                        if (!uidToDept.has(uid)) uidToDept.set(uid, deptName);
-                                                    });
-                                                });
-                                            });
-                                        };
-                                        if (dept.isSubdivided) {
-                                            dept.children?.forEach(sub => mapUids(sub.categories || []));
-                                        } else { mapUids(dept.categories || []); }
+                                        const dn = dept.name;
+                                        const mu = (cats) => { cats.forEach(cat => { cat.keywords?.forEach(kw => { kw.uids?.forEach(uid => { if (!uidToDept.has(uid)) uidToDept.set(uid, dn); }); }); }); };
+                                        if (dept.isSubdivided) { dept.children?.forEach(sub => mu(sub.categories || [])); } else { mu(dept.categories || []); }
                                     });
-
                                     const map = {};
                                     Object.entries(qStates).forEach(([uid, s]) => {
                                         if (!s || !s.confidence || s.status === 'unanswered') return;
-                                        const qk = getQuadrant(s.status, s.confidence);
-                                        if (!qk) return;
-                                        const deptName = uidToDept.get(uid);
-                                        if (!deptName) return;
-                                        if (!map[deptName]) map[deptName] = { name: deptName, mastered: 0, lucky: 0, myth: 0, blank: 0, total: 0 };
-                                        map[deptName][qk]++;
-                                        map[deptName].total++;
+                                        const qk = getQuadrant(s.status, s.confidence); if (!qk) return;
+                                        const dn = uidToDept.get(uid); if (!dn) return;
+                                        if (!map[dn]) map[dn] = { name: dn, mastered: 0, lucky: 0, myth: 0, blank: 0, total: 0 };
+                                        map[dn][qk]++; map[dn].total++;
                                     });
                                     return Object.values(map).filter(d => d.total >= 3);
                                 })();
+                                const Q_COLORS = { mastered: '#10b981', lucky: '#f59e0b', myth: '#ef4444', blank: '#818cf8' };
 
                                 if (totalAnswered === 0) return (
                                     <div className="text-center p-12 bg-white rounded-2xl border border-slate-200">
@@ -1856,32 +1847,38 @@
                                     </div>
                                 );
 
-                                const Q_COLORS = { mastered: '#10b981', lucky: '#f59e0b', myth: '#ef4444', blank: '#818cf8' };
-
                                 return (
                                     <div className="space-y-4">
-                                        {/* 信心評估說明 */}
+                                        {/* 標題 */}
+                                        <div>
+                                            <h2 className="text-xl font-black text-slate-800 tracking-tight mb-0.5">學習進度儀表板</h2>
+                                            <p className="text-xs text-slate-400">基於信心評估的四象限分析 · 已作答 {totalAnswered} 題</p>
+                                        </div>
+
+                                        {/* 信心引導 */}
                                         <details className="bg-white rounded-2xl border border-slate-200 p-5">
-                                            <summary className="cursor-pointer text-sm font-bold text-slate-500 hover:text-teal-600 transition-colors flex items-center gap-2">
-                                                💡 什麼是信心評估？四象限代表什麼？如何幫助我學習？
-                                            </summary>
+                                            <summary className="cursor-pointer text-sm font-bold text-slate-500 hover:text-teal-600 transition-colors flex items-center gap-2">💡 什麼是信心評估？四象限代表什麼？如何幫助我學習？</summary>
                                             <div className="mt-4 space-y-4 text-sm text-slate-600 leading-relaxed">
                                                 <div>
                                                     <h4 className="font-bold text-teal-700 mb-2">① 如何選擇「確定」或「猜的」？</h4>
                                                     <p className="mb-2">不是問你「知不知道答案」，而是：<strong>「如果這題換一個類似的臨床情境，我還能答對嗎？」</strong></p>
-                                                    <p><strong>💪 我很確定</strong> = 能說出為什麼選這個，也能說出其他選項為什麼錯。</p>
-                                                    <p><strong>🤔 我在猜</strong> = 在兩個以上選項間猶豫過；靠刪去法或直覺選的；有選項觀念不熟。</p>
+                                                    <div className="grid md:grid-cols-2 gap-2 mt-3">
+                                                        <div className="bg-teal-50 rounded-lg p-3 border border-teal-100"><strong className="text-teal-700">💪 我很確定</strong><span className="text-xs text-slate-500 block mt-1">能說出為什麼選這個，也能說出其他選項為什麼錯。即使情境改變也有信心。</span></div>
+                                                        <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><strong className="text-slate-600">🤔 我在猜</strong><span className="text-xs text-slate-500 block mt-1">在兩個以上選項間猶豫；靠刪去法或直覺；有選項觀念不熟。選「猜的」不丟臉。</span></div>
+                                                    </div>
                                                 </div>
                                                 <div>
                                                     <h4 className="font-bold text-amber-700 mb-2">② 四象限狀態系統</h4>
-                                                    <p>🟢 <strong>真懂</strong>（答對+確定）— 已內化，考試能穩定輸出。</p>
-                                                    <p>🟡 <strong>運氣</strong>（答對+猜的）— 這次對了，但換情境可能不行。</p>
-                                                    <p>🔴 <strong>危險迷思</strong>（答錯+確定）— 最危險！帶著錯誤信念，會有信心地選錯。</p>
-                                                    <p>🟣 <strong>知識空白</strong>（答錯+猜的）— 知道自己不會，至少有自覺。</p>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div className="bg-emerald-50 rounded-lg p-2.5 border border-emerald-100"><span className="text-xs"><strong className="text-emerald-700">🟢 真懂</strong>（答對+確定）— 已內化，考試能穩定輸出。</span></div>
+                                                        <div className="bg-amber-50 rounded-lg p-2.5 border border-amber-100"><span className="text-xs"><strong className="text-amber-700">🟡 運氣</strong>（答對+猜的）— 換情境可能不行，需鞏固。</span></div>
+                                                        <div className="bg-red-50 rounded-lg p-2.5 border border-red-100"><span className="text-xs"><strong className="text-red-700">🔴 危險迷思</strong>（答錯+確定）— 最危險！會有信心地選錯。</span></div>
+                                                        <div className="bg-indigo-50 rounded-lg p-2.5 border border-indigo-100"><span className="text-xs"><strong className="text-indigo-700">🟣 知識空白</strong>（答錯+猜的）— 知道自己不會，至少有自覺。</span></div>
+                                                    </div>
                                                 </div>
                                                 <div>
                                                     <h4 className="font-bold text-sky-700 mb-2">③ 狀態會隨學習自然進步</h4>
-                                                    <p>每次複習重新作答，系統會自動根據最新表現更新狀態。你的目標是讓越來越多題目變成 🟢 真懂。</p>
+                                                    <p className="text-xs text-slate-500">每次複習重新作答，系統自動更新狀態。🟣→🟡→🟢 是典型的進步路徑。目標是讓越來越多題目變成 🟢 真懂。</p>
                                                 </div>
                                                 <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
                                                     <h4 className="font-bold text-slate-600 mb-1 text-xs">⏳ 關於「看懂」和「記住」</h4>
@@ -1890,113 +1887,47 @@
                                             </div>
                                         </details>
 
-                                        {/* 四象限圓環 + 本週學習 + 校準度 */}
-                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                                            {/* 左：四象限圓環 */}
-                                            <div className="md:col-span-7 bg-white rounded-2xl border border-slate-200 p-6">
-                                                <h3 className="text-sm font-bold text-slate-500 mb-4">目前四象限分佈</h3>
-                                                <div className="flex items-center gap-6">
-                                                    {/* SVG 空心圓餅圖 */}
-                                                    <svg viewBox="0 0 120 120" width="140" height="140" className="flex-shrink-0">
-                                                        {(() => {
-                                                            const r = 50, circumference = 2 * Math.PI * r;
-                                                            const segments = [
-                                                                { key: 'mastered', value: counts.mastered },
-                                                                { key: 'lucky', value: counts.lucky },
-                                                                { key: 'myth', value: counts.myth },
-                                                                { key: 'blank', value: counts.blank },
-                                                            ];
-                                                            let offset = 0;
-                                                            return segments.map(seg => {
-                                                                const pct = totalAnswered > 0 ? seg.value / totalAnswered : 0;
-                                                                const dash = circumference * pct;
-                                                                const gap = circumference - dash;
-                                                                const el = <circle key={seg.key} cx="60" cy="60" r={r} fill="none" stroke={Q_COLORS[seg.key]} strokeWidth="14" strokeDasharray={`${dash} ${gap}`} strokeDashoffset={-offset} strokeLinecap="butt" transform="rotate(-90 60 60)" style={{ opacity: 0.9 }} />;
-                                                                offset += dash;
-                                                                return el;
-                                                            });
-                                                        })()}
-                                                        <text x="60" y="55" textAnchor="middle" className="fill-slate-800" style={{ fontSize: '22px', fontWeight: 900 }}>{masteredPct}%</text>
-                                                        <text x="60" y="72" textAnchor="middle" className="fill-slate-400" style={{ fontSize: '9px', fontWeight: 700 }}>真懂率</text>
+                                        {/* 頂部摘要：圓環(左5) + 本週學習+校準度(右7) */}
+                                        <div className="grid grid-cols-12 gap-3">
+                                            {/* 四象限圓環 */}
+                                            <div className="col-span-12 md:col-span-5 bg-white rounded-2xl border border-slate-200 p-6">
+                                                <h3 className="text-sm font-bold text-slate-500 mb-3">目前四象限分佈</h3>
+                                                <div className="flex items-center gap-5">
+                                                    <svg viewBox="0 0 120 120" width="130" height="130" className="flex-shrink-0">
+                                                        {(() => { const r=50, circ=2*Math.PI*r; let off=0; return ['mastered','lucky','myth','blank'].map(k => { const p=totalAnswered>0?counts[k]/totalAnswered:0, d=circ*p; const el=<circle key={k} cx="60" cy="60" r={r} fill="none" stroke={Q_COLORS[k]} strokeWidth="14" strokeDasharray={`${d} ${circ-d}`} strokeDashoffset={-off} strokeLinecap="butt" transform="rotate(-90 60 60)" opacity="0.9"/>; off+=d; return el; }); })()}
+                                                        <text x="60" y="55" textAnchor="middle" style={{fontSize:'22px',fontWeight:900}} className="fill-slate-800">{masteredPct}%</text>
+                                                        <text x="60" y="72" textAnchor="middle" style={{fontSize:'9px',fontWeight:700}} className="fill-slate-400">真懂率</text>
                                                     </svg>
-                                                    {/* 右側圖例 */}
-                                                    <div className="space-y-2.5 flex-1">
-                                                        {[
-                                                            { key: 'mastered', label: '真懂' },
-                                                            { key: 'lucky', label: '運氣' },
-                                                            { key: 'myth', label: '危險迷思' },
-                                                            { key: 'blank', label: '知識空白' },
-                                                        ].map(item => (
-                                                            <div key={item.key} className="flex items-center justify-between">
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="w-2.5 h-2.5 rounded-sm" style={{ background: Q_COLORS[item.key] }} />
-                                                                    <span className="text-xs font-bold text-slate-500">{item.label}</span>
-                                                                </div>
-                                                                <div className="flex items-baseline gap-1.5">
-                                                                    <span className="text-sm font-black text-slate-700">{counts[item.key]}</span>
-                                                                    <span className="text-[10px] text-slate-400">{totalAnswered > 0 ? Math.round((counts[item.key] / totalAnswered) * 100) : 0}%</span>
-                                                                </div>
+                                                    <div className="space-y-2 flex-1">
+                                                        {['mastered','lucky','myth','blank'].map(k => (
+                                                            <div key={k} className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-sm" style={{background:Q_COLORS[k]}}/><span className="text-xs font-bold text-slate-500">{Q_LABELS[k].label}</span></div>
+                                                                <div className="flex items-baseline gap-1.5"><span className="text-sm font-black text-slate-700">{counts[k]}</span><span className="text-[10px] text-slate-400">{totalAnswered>0?Math.round((counts[k]/totalAnswered)*100):0}%</span></div>
                                                             </div>
                                                         ))}
                                                     </div>
                                                 </div>
                                             </div>
-
-                                            {/* 右：本週學習 + 校準度 */}
-                                            <div className="md:col-span-5 flex flex-col gap-3">
+                                            {/* 右側：本週學習 + 校準度（2x1 grid） */}
+                                            <div className="col-span-12 md:col-span-7 grid grid-cols-2 gap-3">
                                                 {/* 本週學習 */}
-                                                <div className="bg-white rounded-2xl border border-slate-200 p-5 flex-1">
+                                                <div className="bg-white rounded-2xl border border-slate-200 p-5">
                                                     <h3 className="text-xs font-bold text-slate-400 mb-2">本週學習</h3>
-                                                    {(() => {
-                                                        const now = Date.now();
-                                                        const weekAgo = now - 7 * 86400000;
-                                                        const weekCount = Object.values(qStates).filter(s => s && s.answeredAt && s.answeredAt > weekAgo).length;
-                                                        const daySet = new Set();
-                                                        Object.values(qStates).forEach(s => {
-                                                            if (s && s.answeredAt) { const d = new Date(s.answeredAt); daySet.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`); }
-                                                        });
-                                                        let streak = 0;
-                                                        for (let i = 0; i < 30; i++) {
-                                                            const d = new Date(now - i * 86400000);
-                                                            if (daySet.has(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`)) streak++;
-                                                            else if (i > 0) break;
-                                                        }
-                                                        const gc = ['#99f6e4','#5eead4','#2dd4bf','#14b8a6','#0d9488','#0f766e','#115e59'];
-                                                        return (<>
-                                                            <div className="flex items-baseline gap-1 mb-1">
-                                                                <span className="text-3xl font-black text-slate-800">{weekCount}</span>
-                                                                <span className="text-sm text-slate-400 font-bold">題</span>
-                                                            </div>
-                                                            <p className="text-[10px] text-slate-400 mb-3">已連續學習 <span className="text-teal-600 font-bold">{streak}</span> 天</p>
-                                                            <div className="flex gap-1">
-                                                                {[1,2,3,4,5,6,7].map(day => (
-                                                                    <div key={day} className={`flex-1 h-7 rounded-md flex items-center justify-center text-[10px] font-black ${day <= streak ? 'text-white' : 'text-slate-300 bg-slate-50 border border-slate-200'}`}
-                                                                        style={day <= streak ? { background: gc[day-1] } : {}}>
-                                                                        {day}
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                            {streak >= 7 ? <p className="text-[10px] text-amber-600 font-bold mt-2.5">🔥 完美的一週！考場上你會感謝現在的自己。</p>
-                                                            : streak >= 4 ? <p className="text-[10px] text-teal-600 font-bold mt-2.5">💪 穩定累積中！差距就是這樣拉開的。</p>
-                                                            : streak >= 1 ? <p className="text-[10px] text-slate-400 font-bold mt-2.5">🌱 每一天都算數，今天也來做幾題吧！</p>
-                                                            : null}
-                                                        </>);
-                                                    })()}
+                                                    <div className="flex items-baseline gap-1 mb-1"><span className="text-3xl font-black text-slate-800">{weekCount}</span><span className="text-sm text-slate-400 font-bold">題</span></div>
+                                                    <p className="text-[10px] text-slate-400 mb-3">已連續學習 <span className="text-teal-600 font-bold">{streak}</span> 天</p>
+                                                    <div className="flex gap-1">
+                                                        {[1,2,3,4,5,6,7].map(day => { const gc=['#99f6e4','#5eead4','#2dd4bf','#14b8a6','#0d9488','#0f766e','#115e59']; return <div key={day} className={`flex-1 h-7 rounded-md flex items-center justify-center text-[10px] font-black ${day<=streak?'text-white':'text-slate-300 bg-slate-50 border border-slate-200'}`} style={day<=streak?{background:gc[day-1]}:{}}>{day}</div>; })}
+                                                    </div>
+                                                    {streak>=7?<p className="text-[10px] text-amber-600 font-bold mt-2.5">🔥 完美的一週！考場上你會感謝現在的自己。</p>:streak>=4?<p className="text-[10px] text-teal-600 font-bold mt-2.5">💪 穩定累積中！差距就是這樣拉開的。</p>:streak>=1?<p className="text-[10px] text-slate-400 font-bold mt-2.5">🌱 每一天都算數，今天也來做幾題吧！</p>:null}
                                                 </div>
-
                                                 {/* 信心校準度 */}
-                                                <div className="bg-white rounded-2xl border border-slate-200 p-5 flex-1">
+                                                <div className="bg-white rounded-2xl border border-slate-200 p-5">
                                                     <h3 className="text-xs font-bold text-slate-400 mb-2">信心校準度</h3>
-                                                    <div className="flex items-baseline gap-1">
-                                                        <span className={`text-3xl font-black ${calibrationPct >= 80 ? 'text-emerald-600' : calibrationPct >= 60 ? 'text-amber-500' : 'text-red-500'}`}>{calibrationPct}%</span>
-                                                        <span className="text-xs text-slate-400">({sureCorrect}/{sureAnswers.length})</span>
-                                                    </div>
+                                                    <div className="flex items-baseline gap-1"><span className={`text-3xl font-black ${calibrationPct>=80?'text-emerald-600':calibrationPct>=60?'text-amber-500':'text-red-500'}`}>{calibrationPct}%</span><span className="text-xs text-slate-400">({sureCorrect}/{sureAnswers.length})</span></div>
                                                     <p className="text-[10px] text-slate-400 mt-1">你選「確定」的題目中實際答對的比例</p>
-                                                    <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                                        <div className={`h-full rounded-full ${calibrationPct >= 80 ? 'bg-emerald-500' : calibrationPct >= 60 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${calibrationPct}%` }} />
-                                                    </div>
-                                                    <p className={`text-[10px] mt-1.5 font-bold leading-relaxed ${calibrationPct >= 80 ? 'text-emerald-600' : calibrationPct >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
-                                                        {calibrationPct >= 80 ? '校準良好 — 你對自己的掌握程度判斷很準確，繼續保持！' : calibrationPct >= 60 ? '持續進步中 — 有些你覺得確定的題目其實還不太穩。看完解析後，問自己：我能完整解釋其他選項為什麼錯嗎？' : '值得留意 — 你可能對某些觀念有誤解但尚未察覺。這正是信心評估幫你發現的價值。遇到猶豫的題目時，選「猜的」會更誠實。'}
+                                                    <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${calibrationPct>=80?'bg-emerald-500':calibrationPct>=60?'bg-amber-500':'bg-red-500'}`} style={{width:`${calibrationPct}%`}}/></div>
+                                                    <p className={`text-[10px] mt-1.5 font-bold leading-relaxed ${calibrationPct>=80?'text-emerald-600':calibrationPct>=60?'text-amber-600':'text-red-600'}`}>
+                                                        {calibrationPct>=80?'校準良好 — 你對自己的掌握程度判斷很準確，繼續保持！':calibrationPct>=60?'持續進步中 — 有些你覺得確定的題目其實還不太穩。看完解析後，問自己：我能完整解釋其他選項為什麼錯嗎？':'值得留意 — 你可能對某些觀念有誤解但尚未察覺。這正是信心評估幫你發現的價值。遇到猶豫的題目時，選「猜的」會更誠實。'}
                                                     </p>
                                                 </div>
                                             </div>
@@ -2006,88 +1937,25 @@
                                         {deptStats.length > 0 && (
                                             <div className="bg-white rounded-2xl border border-slate-200 p-6">
                                                 <div className="flex items-start justify-between mb-2">
-                                                    <div>
-                                                        <h3 className="text-sm font-bold text-slate-700">各科學習狀態</h3>
-                                                        <p className="text-[11px] text-slate-400 mt-0.5">依真懂率由低到高排序 · 綠色超過虛線即達標（60%）</p>
-                                                    </div>
-                                                    {daysUntilExam != null && (
-                                                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border ${daysUntilExam > 30 ? 'bg-sky-50 text-sky-600 border-sky-200' : daysUntilExam > 14 ? 'bg-amber-50 text-amber-600 border-amber-200' : daysUntilExam > 7 ? 'bg-red-50 text-red-600 border-red-200' : 'bg-purple-50 text-purple-600 border-purple-200'}`}>
-                                                            {daysUntilExam > 30 ? '📚 基礎建設期' : daysUntilExam > 14 ? '🔄 鞏固期' : daysUntilExam > 7 ? '⚡ 衝刺期' : '🧘 維持期'} · 倒數 {daysUntilExam} 天
-                                                        </span>
-                                                    )}
+                                                    <div><h3 className="text-sm font-bold text-slate-700">各科學習狀態與準備建議</h3><p className="text-[11px] text-slate-400 mt-0.5">依真懂率由低到高排序 · 綠色超過虛線即達標（60%）</p></div>
+                                                    {daysUntilExam!=null&&(<span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border flex-shrink-0 ${daysUntilExam>30?'bg-sky-50 text-sky-600 border-sky-200':daysUntilExam>14?'bg-amber-50 text-amber-600 border-amber-200':daysUntilExam>7?'bg-red-50 text-red-600 border-red-200':'bg-purple-50 text-purple-600 border-purple-200'}`}>{daysUntilExam>30?'📚 基礎建設期':daysUntilExam>14?'🔄 鞏固期':daysUntilExam>7?'⚡ 衝刺期':'🧘 維持期'} · 倒數 {daysUntilExam} 天</span>)}
                                                 </div>
-
-                                                {/* 階段策略 */}
-                                                {daysUntilExam != null && (
-                                                    <div className="bg-slate-50 rounded-xl p-3 mb-4 border border-slate-100">
-                                                        <p className="text-[11px] text-slate-500 leading-relaxed">
-                                                            {daysUntilExam > 30 ? '📚 現階段重點：填補知識空白、建立廣度。優先處理紫色比例高的科目，從重要考點開始。' :
-                                                             daysUntilExam > 14 ? '🔄 現階段重點：把 🟡 運氣題透過間隔複習推進到 🟢 真懂。同時持續消滅 🔴 危險迷思。' :
-                                                             daysUntilExam > 7 ? '⚡ 衝刺重點：第一優先消滅 🔴 危險迷思（最容易撿分）。第二快速過 🟡 運氣題。不建議再補新知識。' :
-                                                             '🧘 只做「真懂」題目保持手感。適度休息比多做 50 題更重要。你已經準備好了。'}
-                                                        </p>
-                                                    </div>
-                                                )}
-
-                                                {/* 圖例 */}
-                                                <div className="flex gap-3 mb-3">
-                                                    {Object.entries(Q_LABELS).map(([k, v]) => (
-                                                        <span key={k} className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
-                                                            <span className="w-2 h-2 rounded-sm inline-block" style={{ background: Q_COLORS[k] }}></span>{v.label}
-                                                        </span>
-                                                    ))}
-                                                </div>
-
-                                                {/* 科別條狀圖 */}
+                                                {daysUntilExam!=null&&(<div className="bg-slate-50 rounded-xl p-3 mb-4 border border-slate-100 text-[11px] text-slate-500 leading-relaxed">{daysUntilExam>30?'📚 現階段重點：填補知識空白、建立廣度。優先處理紫色比例高的科目，從重要考點開始。':daysUntilExam>14?'🔄 現階段重點：把 🟡 運氣題透過間隔複習推進到 🟢 真懂。同時持續消滅 🔴 危險迷思。':daysUntilExam>7?'⚡ 衝刺重點：第一優先消滅 🔴 危險迷思（最容易撿分）。第二快速過 🟡 運氣題。不建議再補新知識。':'🧘 只做「真懂」題目保持手感。適度休息比多做 50 題更重要。你已經準備好了。'}</div>)}
+                                                <div className="flex gap-3 mb-3">{Object.entries(Q_LABELS).map(([k,v])=>(<span key={k} className="text-[10px] text-slate-400 font-bold flex items-center gap-1"><span className="w-2 h-2 rounded-sm inline-block" style={{background:Q_COLORS[k]}}></span>{v.label}</span>))}</div>
                                                 <div className="space-y-1.5">
-                                                    {deptStats.sort((a, b) => (a.mastered / a.total) - (b.mastered / b.total)).map(dept => {
-                                                        const mPct = Math.round((dept.mastered / dept.total) * 100);
-                                                        return (
-                                                            <div key={dept.name} className="flex items-center gap-2.5 py-1">
-                                                                <span className="text-xs font-bold text-slate-400 w-24 text-right truncate flex-shrink-0">{dept.name.replace(/^\d+\s*/, '')}</span>
-                                                                <div className="flex-1 h-6 rounded-md overflow-hidden flex bg-slate-100 relative">
-                                                                    {['mastered', 'lucky', 'myth', 'blank'].map(key => {
-                                                                        const pct = (dept[key] / dept.total) * 100;
-                                                                        if (pct === 0) return null;
-                                                                        const isMastered = key === 'mastered';
-                                                                        return (
-                                                                            <div key={key} className={`relative ${isMastered ? '' : 'group/seg'}`} style={{ width: `${pct}%`, background: Q_COLORS[key], opacity: 0.85 }}>
-                                                                                {isMastered && pct >= 8 && <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><span className="text-[9px] font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{mPct}%</span></div>}
-                                                                                {!isMastered && <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/seg:opacity-100 transition-opacity pointer-events-none"><span className="text-[9px] font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{Math.round(pct)}%</span></div>}
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                    <div className="absolute top-0 bottom-0 w-px border-l border-dashed border-slate-400/50 pointer-events-none" style={{ left: '60%' }}></div>
-                                                                </div>
-                                                            </div>
-                                                        );
+                                                    {deptStats.sort((a,b)=>(a.mastered/a.total)-(b.mastered/b.total)).map((dept,i)=>{
+                                                        const mP=Math.round((dept.mastered/dept.total)*100);
+                                                        return (<div key={dept.name} className="flex items-center gap-2.5 py-1"><span className="text-xs font-bold text-slate-400 w-24 text-right truncate flex-shrink-0">{dept.name.replace(/^\d+\s*/,'')}</span><div className="flex-1 h-6 rounded-md overflow-hidden flex bg-slate-100 relative">{['mastered','lucky','myth','blank'].map(key=>{const pct=(dept[key]/dept.total)*100;if(pct===0)return null;const isM=key==='mastered';return(<div key={key} className={`relative ${isM?'':'group/seg'}`} style={{width:`${pct}%`,background:Q_COLORS[key],opacity:0.85}}>{isM&&pct>=8&&<div className="absolute inset-0 flex items-center justify-center pointer-events-none"><span className="text-[9px] font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{mP}%</span></div>}{!isM&&<div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/seg:opacity-100 transition-opacity pointer-events-none"><span className="text-[9px] font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{Math.round(pct)}%</span></div>}</div>);})}<div className="absolute top-0 bottom-0 w-px border-l border-dashed border-slate-400/50 pointer-events-none" style={{left:'60%'}}>{i===0&&<span className="absolute -top-4 -translate-x-1/2 text-[8px] text-slate-400 font-bold whitespace-nowrap">目標 60%</span>}</div></div></div>);
                                                     })}
                                                 </div>
-
-                                                {/* 針對性建議 */}
-                                                {(() => {
-                                                    const mythHigh = deptStats.filter(d => d.myth / d.total > 0.08);
-                                                    const blankHigh = deptStats.filter(d => d.blank / d.total > 0.4);
-                                                    const luckyHigh = deptStats.filter(d => d.lucky / d.total > 0.25 && d.myth / d.total <= 0.08);
-                                                    const strong = deptStats.filter(d => d.mastered / d.total >= 0.6);
-                                                    const stripNum = (n) => n.replace(/^\d+\s*/, '');
-                                                    if (!mythHigh.length && !blankHigh.length && !luckyHigh.length && !strong.length) return null;
-                                                    return (
-                                                        <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
-                                                            <h4 className="text-xs font-bold text-slate-400 mb-2">📋 針對性準備建議</h4>
-                                                            {mythHigh.length > 0 && <div className="flex gap-2 items-start bg-red-50 rounded-lg p-3 border border-red-100"><span className="flex-shrink-0 text-sm">🔴</span><div><div className="text-red-600 font-bold text-xs mb-0.5">最優先：修正危險迷思</div><p className="text-slate-500 text-[11px] leading-relaxed"><strong>{mythHigh.map(d => stripNum(d.name)).join('、')}</strong> 的迷思比例較高。回到錯題，找出觀念偏差的根源。</p></div></div>}
-                                                            {blankHigh.length > 0 && <div className="flex gap-2 items-start bg-indigo-50 rounded-lg p-3 border border-indigo-100"><span className="flex-shrink-0 text-sm">🟣</span><div><div className="text-indigo-600 font-bold text-xs mb-0.5">需要補強</div><p className="text-slate-500 text-[11px] leading-relaxed"><strong>{blankHigh.map(d => stripNum(d.name)).join('、')}</strong> 知識空白較多。從重要考點開始建立核心觀念。</p></div></div>}
-                                                            {luckyHigh.length > 0 && <div className="flex gap-2 items-start bg-amber-50 rounded-lg p-3 border border-amber-100"><span className="flex-shrink-0 text-sm">🟡</span><div><div className="text-amber-600 font-bold text-xs mb-0.5">值得鞏固</div><p className="text-slate-500 text-[11px] leading-relaxed"><strong>{luckyHigh.map(d => stripNum(d.name)).join('、')}</strong> 隔幾天重做一次，把運氣推進到真懂。</p></div></div>}
-                                                            {strong.length > 0 && <div className="flex gap-2 items-start bg-emerald-50 rounded-lg p-3 border border-emerald-100"><span className="flex-shrink-0 text-sm">🟢</span><div><div className="text-emerald-600 font-bold text-xs mb-0.5">表現穩定</div><p className="text-slate-500 text-[11px] leading-relaxed"><strong>{strong.map(d => stripNum(d.name)).join('、')}</strong> 真懂率達標，可降低頻率讓時間給弱科。</p></div></div>}
-                                                        </div>
-                                                    );
-                                                })()}
+                                                {(()=>{const mH=deptStats.filter(d=>d.myth/d.total>0.08),bH=deptStats.filter(d=>d.blank/d.total>0.4),lH=deptStats.filter(d=>d.lucky/d.total>0.25&&d.myth/d.total<=0.08),sT=deptStats.filter(d=>d.mastered/d.total>=0.6),st=n=>n.replace(/^\d+\s*/,'');if(!mH.length&&!bH.length&&!lH.length&&!sT.length)return null;return(<div className="mt-4 pt-4 border-t border-slate-100 space-y-2"><h4 className="text-xs font-bold text-slate-400 mb-2">📋 針對性準備建議</h4>{mH.length>0&&<div className="flex gap-2 items-start bg-red-50 rounded-lg p-3 border border-red-100"><span className="flex-shrink-0 text-sm">🔴</span><div><div className="text-red-600 font-bold text-xs mb-0.5">最優先：修正危險迷思</div><p className="text-slate-500 text-[11px] leading-relaxed"><strong>{mH.map(d=>st(d.name)).join('、')}</strong> 的迷思比例較高。建議回到錯題，找出觀念偏差的根源。</p></div></div>}{bH.length>0&&<div className="flex gap-2 items-start bg-indigo-50 rounded-lg p-3 border border-indigo-100"><span className="flex-shrink-0 text-sm">🟣</span><div><div className="text-indigo-600 font-bold text-xs mb-0.5">需要補強：知識空白較多</div><p className="text-slate-500 text-[11px] leading-relaxed"><strong>{bH.map(d=>st(d.name)).join('、')}</strong> 從重要考點開始，每天固定進度更有效。</p></div></div>}{lH.length>0&&<div className="flex gap-2 items-start bg-amber-50 rounded-lg p-3 border border-amber-100"><span className="flex-shrink-0 text-sm">🟡</span><div><div className="text-amber-600 font-bold text-xs mb-0.5">值得鞏固：答對但不穩定</div><p className="text-slate-500 text-[11px] leading-relaxed"><strong>{lH.map(d=>st(d.name)).join('、')}</strong> 隔幾天重做一次，把運氣推進到真懂。</p></div></div>}{sT.length>0&&<div className="flex gap-2 items-start bg-emerald-50 rounded-lg p-3 border border-emerald-100"><span className="flex-shrink-0 text-sm">🟢</span><div><div className="text-emerald-600 font-bold text-xs mb-0.5">表現穩定的科目</div><p className="text-slate-500 text-[11px] leading-relaxed"><strong>{sT.map(d=>st(d.name)).join('、')}</strong> 真懂率達標，可降低頻率讓時間給弱科。</p></div></div>}</div>);})()}
                                             </div>
                                         )}
                                     </div>
                                 );
                             })()}
                         </div>
+
                     </main>
                     {/* 意見回饋彈窗 */}
                     {showFeedbackModal && (
