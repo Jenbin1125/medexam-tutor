@@ -1095,6 +1095,13 @@
             const [loadingStarred, setLoadingStarred] = React.useState(false);
             const [reviewPage, setReviewPage] = React.useState(0);
             const [reviewFilter, setReviewFilter] = React.useState('today');
+            const [confirmedMastered, setConfirmedMastered] = React.useState(() => {
+                try { const s = localStorage.getItem(`medtutor_confirmed_${userId}`); return s ? new Set(JSON.parse(s)) : new Set(); } catch { return new Set(); }
+            });
+            React.useEffect(() => {
+                if (userId && confirmedMastered.size > 0) localStorage.setItem(`medtutor_confirmed_${userId}`, JSON.stringify([...confirmedMastered]));
+            }, [confirmedMastered, userId]);
+            const confirmMastery = (uid) => { setConfirmedMastered(p => { const n = new Set(p); n.add(uid); return n; }); };
             const [reviewQuestions, setReviewQuestions] = React.useState([]);
             const [loadingReview, setLoadingReview] = React.useState(false);
             const REVIEW_PAGE_SIZE = 5;
@@ -1329,6 +1336,8 @@
 
                 // 今日推薦排序：危險迷思 > 運氣 > 知識空白 > 真懂，同優先級按 answeredAt 舊的優先
                 categories.today.sort((a, b) => a.priority - b.priority || a.answeredAt - b.answeredAt);
+                    // 從真懂分類中排除已確認精熟的題目
+                    categories.mastered = categories.mastered.filter(t => !confirmedMastered.has(t.uid));
                 categories.today = categories.today.slice(0, 10); // 每日上限 10 題
 
                 return categories;
@@ -1611,7 +1620,7 @@
                                                         <div className="flex justify-end mt-4">
                                                             <button onClick={() => toggleStar(q.uid)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm ${starredUids.has(q.uid) ? 'bg-amber-100 border-2 border-amber-400 text-amber-700 hover:bg-amber-50' : 'bg-amber-500 hover:bg-amber-600 text-white border-2 border-amber-500'}`}>
                                                                 <Icons.Star filled={starredUids.has(q.uid)} className="w-4 h-4" />
-                                                                {starredUids.has(q.uid) ? '已收藏（點擊移出）' : '收藏至考前複習'}
+                                                                {starredUids.has(q.uid) ? '已收藏（點擊移出）' : '收藏至智慧複習'}
                                                             </button>
                                                         </div>
                                                     )}
@@ -1627,89 +1636,44 @@
             return (
                 <div className="min-h-screen flex flex-col">
                     <header className="bg-slate-900 text-white shadow-md sticky top-0 z-30">
+                        {/* 第一行：Logo + 工具列 */}
                         <div className="max-w-4xl mx-auto px-4 py-2 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="bg-gradient-to-br from-teal-400 to-teal-600 p-1.5 rounded-lg shadow"><Icons.Network /></div>
                                 <h1 className="text-base font-bold tracking-wide hidden md:block">AI 臨床導師</h1>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                {/* 導覽頁籤 */}
-                                <div className="flex gap-1 mr-2 bg-slate-800 p-1 rounded-xl">
-                                    {[{ id: 'graph', label: '知識圖譜', icon: <Icons.Network /> }, { id: 'ai-explain', label: '導師解析', icon: <Icons.Brain /> }, { id: 'review', label: `智慧複習 (${reviewCategories.today.length})`, icon: <Icons.BookOpen /> }, { id: 'dashboard', label: '學習儀表板', icon: <Icons.Target /> }].map(tab => (
-                                        <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 ${activeTab === tab.id ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}>
-                                            <span className="w-4 h-4 flex items-center justify-center">{tab.icon}</span>
-                                            <span className="hidden sm:inline">{tab.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-
-                                {/* 意見回饋按鈕 (純圖示浮動版) */}
-                                <button
-                                    onClick={() => setShowFeedbackModal(true)}
-                                    className="text-slate-300 hover:text-teal-400 p-1.5 rounded-lg hover:bg-slate-800 transition-all duration-200 hover:-translate-y-0.5 hover:scale-110 hidden sm:flex border border-slate-700 shadow-sm"
-                                    title="意見回饋 (回報問題或功能許願)"
-                                >
-                                    <span className="w-4 h-4 flex items-center justify-center"><Icons.Mail /></span>
-                                </button>
-
-                                {/* 管理員按鈕 */}
-                                {isAdmin && <button onClick={() => setShowAdmin(!showAdmin)} className={`p-1.5 rounded-lg transition-colors ${showAdmin ? 'bg-amber-500 text-white' : 'text-slate-400 hover:text-amber-400 hover:bg-slate-700'}`} title="管理員設定"><Icons.Shield /></button>}
-
-                                {/* 使用者 Email */}
-                                <span className="text-[10px] text-slate-500 hidden lg:block ml-2">{session?.user?.email}</span>
-
-                                {/* Google 帳號綁定狀態 (精簡圖示版) */}
-                                {!isGoogleLinked ? (
-                                    <button
-                                        onClick={handleLinkGoogle}
-                                        className="text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 border border-amber-200 shadow-sm whitespace-nowrap"
-                                        title="預防醫院信箱失效，請點擊綁定 Google 帳號"
-                                    >
-                                        <Icons.Google />
-                                        <span className="font-bold">未綁定</span>
-                                    </button>
-                                ) : (
-                                    <div
-                                        className="text-xs bg-slate-800 text-slate-300 px-2 py-1.5 rounded-lg flex items-center gap-1.5 border border-slate-700 cursor-default whitespace-nowrap"
-                                        title="已安全綁定 Google 帳號"
-                                    >
-                                        <Icons.Google />
-                                        <Icons.Check className="w-3.5 h-3.5 text-teal-400 -ml-0.5" />
+                                {daysUntilExam !== null && (
+                                    <div className="flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700/50 ml-1">
+                                        <span className="text-teal-400 font-black text-sm tabular-nums">{daysUntilExam}</span><span className="text-slate-500 text-[10px] font-bold">天</span>
+                                        <div className="w-px h-3.5 bg-slate-700"></div>
+                                        <span className="text-slate-400 text-[10px] font-bold">{importantProgress.completed}<span className="text-slate-600">/{importantProgress.total}</span></span>
+                                        <span className="text-teal-400 text-[10px] font-bold">({importantProgress.pct}%)</span>
                                     </div>
                                 )}
-
-                                {/* 淺/深色模式切換 */}
-                                <div className="ml-1">
-                                    <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
-                                </div>
-
-                                {/* 分隔線 */}
-                                <div className="w-px h-5 bg-slate-700 mx-1"></div>
-
-                                {/* 登出按鈕 (純圖示旋轉特效版) */}
-                                <button
-                                    onClick={onLogout}
-                                    className="text-slate-400 hover:text-red-400 p-2 rounded-lg hover:bg-slate-800 transition-all duration-200 hover:scale-110 hover:rotate-3"
-                                    title="登出系統"
-                                >
-                                    <Icons.LogOut />
-                                </button>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <button onClick={() => setShowFeedbackModal(true)} className="text-slate-400 hover:text-teal-400 p-1.5 rounded-lg hover:bg-slate-800 transition-all hidden sm:flex" title="意見回饋"><Icons.Mail /></button>
+                                {isAdmin && <button onClick={() => setShowAdmin(!showAdmin)} className={`p-1.5 rounded-lg transition-colors ${showAdmin ? 'bg-amber-500 text-white' : 'text-slate-400 hover:text-amber-400 hover:bg-slate-700'}`} title="管理員設定"><Icons.Shield /></button>}
+                                {!isGoogleLinked ? (
+                                    <button onClick={handleLinkGoogle} className="text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 px-2 py-1 rounded-lg flex items-center gap-1 border border-amber-200 whitespace-nowrap" title="綁定 Google 帳號"><Icons.Google /><span className="font-bold hidden sm:inline">未綁定</span></button>
+                                ) : (
+                                    <div className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-lg flex items-center gap-1 border border-slate-700 cursor-default" title="已綁定 Google"><Icons.Google /><Icons.Check className="w-3.5 h-3.5 text-teal-400 -ml-0.5" /></div>
+                                )}
+                                <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+                                <div className="w-px h-4 bg-slate-700"></div>
+                                <button onClick={onLogout} className="text-slate-400 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800 transition-all" title="登出"><Icons.LogOut /></button>
                             </div>
                         </div>
-                        {/* Header 第二行：進度儀表板 + 每日一語 */}
+                        {/* 第二行：Tab 導航（左） + 每日一語（右） */}
                         <div className="max-w-4xl mx-auto px-4 pb-2 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                                <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1 rounded-lg border border-slate-700/50 flex-shrink-0">
-                                    {daysUntilExam !== null && (<><span className="text-teal-400 font-black text-lg tabular-nums">{daysUntilExam}</span><span className="text-slate-500 text-[10px] font-bold">天</span><div className="w-px h-4 bg-slate-700"></div></>)}
-                                    <span className="text-slate-400 text-[11px] font-bold">{importantProgress.completed}<span className="text-slate-600">/{importantProgress.total}</span></span>
-                                    <span className="text-teal-400 text-[11px] font-bold">({importantProgress.pct}%)</span>
-                                </div>
-                                <p className="text-slate-500 text-[11px] truncate min-w-0 hidden sm:block italic">
-                                    「{dailyQuote.text}」<span className="text-slate-600 not-italic ml-1">— {dailyQuote.author}</span>
-                                </p>
+                            <div className="flex gap-1 bg-slate-800 p-1 rounded-xl flex-shrink-0">
+                                {[{ id: 'graph', label: '知識圖譜', icon: <Icons.Network /> }, { id: 'ai-explain', label: '導師解析', icon: <Icons.Brain /> }, { id: 'review', label: `智慧複習 (${reviewCategories.today.length})`, icon: <Icons.BookOpen /> }, { id: 'dashboard', label: '儀表板', icon: <Icons.Target /> }].map(tab => (
+                                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 ${activeTab === tab.id ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}>
+                                        <span className="w-4 h-4 flex items-center justify-center">{tab.icon}</span>
+                                        <span className="hidden sm:inline">{tab.label}</span>
+                                    </button>
+                                ))}
                             </div>
-                            <span className="text-[10px] text-slate-600 hidden xl:block flex-shrink-0 truncate max-w-[140px]">{session?.user?.email}</span>
+                            <p className="text-slate-500 text-[11px] truncate min-w-0 hidden sm:block italic">「{dailyQuote.text}」</p>
                         </div>
                     </header>
 
@@ -1971,14 +1935,17 @@
                                                         const ql = qk ? Q_LABELS[qk] : null;
                                                         return (
                                                             <div key={q.uid}>
-                                                                {/* 狀態標籤 + 距離上次作答 */}
+                                                                {/* 狀態標籤 + 距離上次作答 + 精熟確認 */}
                                                                 {ql && st.answeredAt && (
                                                                     <div className="flex items-center gap-2 mb-2">
                                                                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ql.cls}`}>{ql.label}</span>
                                                                         <span className="text-[10px] text-slate-400">上次作答：{Math.floor((Date.now() - st.answeredAt) / 86400000)} 天前</span>
+                                                                        {reviewFilter === 'mastered' && (
+                                                                            <button onClick={() => confirmMastery(q.uid)} className="ml-auto text-[10px] font-bold px-3 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all">✅ 已精熟，移出複習</button>
+                                                                        )}
                                                                     </div>
                                                                 )}
-                                                                {renderQuestion(q, safePage * REVIEW_PAGE_SIZE + idx, st.answerSelected ? st : { answerSelected: null, status: 'unanswered', openStates: [false, false, false], showExpl: false, confidence: null, pendingConfidence: false }, 'review')}
+                                                                {renderQuestion(q, safePage * REVIEW_PAGE_SIZE + idx, (['myth','blank','lucky'].includes(reviewFilter)) ? { answerSelected: null, status: 'unanswered', openStates: [false, false, false], showExpl: false, confidence: null, pendingConfidence: false } : (st.answerSelected ? st : { answerSelected: null, status: 'unanswered', openStates: [false, false, false], showExpl: false, confidence: null, pendingConfidence: false }), 'review')}
                                                             </div>
                                                         );
                                                     })}
@@ -2099,8 +2066,8 @@
                                                 <div className="flex items-center gap-5">
                                                     <svg viewBox="0 0 120 120" width="130" height="130" className="flex-shrink-0">
                                                         {(() => { const r=50, circ=2*Math.PI*r; let off=0; return ['mastered','lucky','myth','blank'].map(k => { const p=totalAnswered>0?counts[k]/totalAnswered:0, d=circ*p; const el=<circle key={k} cx="60" cy="60" r={r} fill="none" stroke={Q_COLORS[k]} strokeWidth="14" strokeDasharray={`${d} ${circ-d}`} strokeDashoffset={-off} strokeLinecap="butt" transform="rotate(-90 60 60)" opacity="0.9"/>; off+=d; return el; }); })()}
-                                                        <text x="60" y="55" textAnchor="middle" style={{fontSize:'22px',fontWeight:900}} className="fill-slate-800">{masteredPct}%</text>
-                                                        <text x="60" y="72" textAnchor="middle" style={{fontSize:'9px',fontWeight:700}} className="fill-slate-400">真懂率</text>
+                                                        <text x="60" y="55" textAnchor="middle" style={{fontSize:'22px',fontWeight:900}} className="fill-slate-800 dark:fill-white">{masteredPct}%</text>
+                                                        <text x="60" y="72" textAnchor="middle" style={{fontSize:'9px',fontWeight:700,fill:'#94a3b8'}}>真懂率</text>
                                                     </svg>
                                                     <div className="space-y-2 flex-1">
                                                         {['mastered','lucky','myth','blank'].map(k => (
@@ -2130,8 +2097,8 @@
                                                     <div className="flex items-baseline gap-1"><span className={`text-3xl font-black ${calibrationPct>=80?'text-emerald-600':calibrationPct>=60?'text-amber-500':'text-red-500'}`}>{calibrationPct}%</span><span className="text-xs text-slate-400">({sureCorrect}/{sureAnswers.length})</span></div>
                                                     <p className="text-[10px] text-slate-400 mt-1">你選「確定」的題目中實際答對的比例</p>
                                                     <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${calibrationPct>=80?'bg-emerald-500':calibrationPct>=60?'bg-amber-500':'bg-red-500'}`} style={{width:`${calibrationPct}%`}}/></div>
-                                                    <p className={`text-[10px] mt-1.5 font-bold leading-relaxed ${calibrationPct>=80?'text-emerald-600':calibrationPct>=60?'text-amber-600':'text-red-600'}`}>
-                                                        {calibrationPct>=80?'校準良好 — 你對自己的掌握程度判斷很準確，繼續保持！':calibrationPct>=60?'持續進步中 — 有些你覺得確定的題目其實還不太穩。看完解析後，問自己：我能完整解釋其他選項為什麼錯嗎？':'值得留意 — 你可能對某些觀念有誤解但尚未察覺。這正是信心評估幫你發現的價值。遇到猶豫的題目時，選「猜的」會更誠實。'}
+                                                    <p className="text-[10px] mt-1.5 font-bold leading-relaxed text-slate-500">
+                                                        {calibrationPct>=80?'✅ 校準良好 — 你對自己的掌握程度判斷很準確，繼續保持！':calibrationPct>=60?'💡 持續進步中 — 有些你覺得確定的題目其實還不太穩。看完解析後，問自己：我能完整解釋其他選項為什麼錯嗎？':'💡 值得留意 — 你可能對某些觀念有誤解但尚未察覺。這正是信心評估幫你發現的價值。遇到猶豫的題目時，選「猜的」會更誠實。'}
                                                     </p>
                                                 </div>
                                             </div>
