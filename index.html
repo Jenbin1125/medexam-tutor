@@ -1095,6 +1095,7 @@
             const [loadingStarred, setLoadingStarred] = React.useState(false);
             const [reviewPage, setReviewPage] = React.useState(0);
             const [reviewFilter, setReviewFilter] = React.useState('today');
+            const [starredDisplayMode, setStarredDisplayMode] = React.useState('hide_answer');
             const [confirmedMastered, setConfirmedMastered] = React.useState(() => {
                 try { const s = localStorage.getItem(`medtutor_confirmed_${userId}`); return s ? new Set(JSON.parse(s)) : new Set(); } catch { return new Set(); }
             });
@@ -1344,48 +1345,48 @@
             }, [qStates]);
 
             // ── 載入複習題目 ──
-            const loadReviewQuestions = async (filter) => {
+            // 記錄目前複習頁面載入時的 UID 快照（避免答題後觸發重新載入）
+            const reviewSnapshotRef = React.useRef(null);
+            React.useEffect(() => {
+                if (activeTab !== 'review') return;
+                setReviewPage(0);
+
+                // 取得當前 filter 的 UIDs
                 let uids = [];
-                if (filter === 'starred') {
+                if (reviewFilter === 'starred') {
                     uids = [...starredUids];
-                } else if (filter === 'today') {
+                } else if (reviewFilter === 'today') {
                     uids = reviewCategories.today.map(t => t.uid);
                 } else {
-                    uids = (reviewCategories[filter] || []).map(t => t.uid);
+                    uids = (reviewCategories[reviewFilter] || []).map(t => t.uid);
                 }
+
+                // 危險迷思/知識空白/運氣：重置 qStates 讓題目可重新作答
+                if (['myth', 'blank', 'lucky'].includes(reviewFilter) && uids.length > 0) {
+                    setQStates(prev => {
+                        const next = { ...prev };
+                        uids.forEach(uid => {
+                            next[uid] = { ...next[uid], answerSelected: null, status: 'unanswered', openStates: [false, false, false], showExpl: false, pendingConfidence: false };
+                        });
+                        return next;
+                    });
+                }
+
+                // 快照 UIDs 並載入題目
+                reviewSnapshotRef.current = uids;
                 if (uids.length === 0) { setReviewQuestions([]); return; }
                 setLoadingReview(true);
-                try {
-                    const { data } = await supabase.from('questions').select('*').in('uid', uids);
-                    // 保持排序（today 按優先級，其他按 answeredAt）
-                    if (filter === 'today') {
-                        const order = new Map(uids.map((u, i) => [u, i]));
-                        data?.sort((a, b) => (order.get(a.uid) ?? 999) - (order.get(b.uid) ?? 999));
-                    }
-                    setReviewQuestions(data || []);
-                } catch (e) { console.error(e); } finally { setLoadingReview(false); }
-            };
-
-            React.useEffect(() => {
-                if (activeTab === 'review') {
-                    setReviewPage(0);
-                    // 危險迷思/知識空白/運氣：重置 qStates 讓題目可重新作答
-                    if (['myth', 'blank', 'lucky'].includes(reviewFilter)) {
-                        const uidsToReset = (reviewCategories[reviewFilter] || []).map(t => t.uid);
-                        if (uidsToReset.length > 0) {
-                            setQStates(prev => {
-                                const next = { ...prev };
-                                uidsToReset.forEach(uid => {
-                                    // 保留核心歷史欄位，只重置答題 UI 狀態
-                                    next[uid] = { ...next[uid], answerSelected: null, status: 'unanswered', openStates: [false, false, false], showExpl: false, pendingConfidence: false };
-                                });
-                                return next;
-                            });
+                (async () => {
+                    try {
+                        const { data } = await supabase.from('questions').select('*').in('uid', uids);
+                        if (reviewFilter === 'today') {
+                            const order = new Map(uids.map((u, i) => [u, i]));
+                            data?.sort((a, b) => (order.get(a.uid) ?? 999) - (order.get(b.uid) ?? 999));
                         }
-                    }
-                    loadReviewQuestions(reviewFilter);
-                }
-            }, [activeTab, reviewFilter, reviewCategories, starredUids]);
+                        setReviewQuestions(data || []);
+                    } catch (e) { console.error(e); } finally { setLoadingReview(false); }
+                })();
+            }, [activeTab, reviewFilter]);
 
             // ── 1. 改用我們剛寫好的 RPC 函數撈取進階資料 ──
             const loadAdminEmails = async () => {
@@ -1936,6 +1937,24 @@
                                                 💡 以下題目已重置為可重新作答。不看之前的答案，憑記憶再做一次。答完後系統會根據新結果自動更新狀態 — 答對且確定就能推進到「真懂」。
                                             </div>
                                         )}
+                                        {reviewFilter === 'starred' && reviewQuestions.length > 0 && (
+                                            <div className="bg-white rounded-xl border border-slate-200 p-3">
+                                                <div className="flex flex-wrap items-center gap-3">
+                                                    <span className="text-xs font-bold text-slate-500">顯示方式：</span>
+                                                    {[
+                                                        { id: 'hide_answer', label: '只顯示題目（重新作答）' },
+                                                        { id: 'show_answer', label: '顯示題目 + 答案' },
+                                                        { id: 'show_l3', label: '顯示答案 + Level 3 解析' },
+                                                        { id: 'show_all', label: '顯示全部解析' },
+                                                    ].map(opt => (
+                                                        <button key={opt.id} onClick={() => setStarredDisplayMode(opt.id)}
+                                                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${starredDisplayMode === opt.id ? 'bg-slate-700 text-white border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-400'}`}>
+                                                            {opt.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* 題目列表 */}
                                         {loadingReview ? (
@@ -1965,17 +1984,33 @@
                                                         const st = qStates[q.uid] || {};
                                                         const qk = getQuadrant(st.status, st.confidence);
                                                         const ql = qk ? Q_LABELS[qk] : null;
+
+                                                        // 根據 filter 和 starred 顯示模式決定傳入 renderQuestion 的 state
+                                                        let renderSt = st;
+                                                        let renderMode = 'review';
+                                                        if (reviewFilter === 'starred') {
+                                                            renderMode = 'review-starred';
+                                                            if (starredDisplayMode === 'hide_answer') {
+                                                                renderSt = { answerSelected: null, status: 'unanswered', openStates: [false, false, false], showExpl: false, confidence: null, pendingConfidence: false };
+                                                            } else if (starredDisplayMode === 'show_answer') {
+                                                                renderSt = st.answerSelected ? { ...st, showExpl: false, openStates: [false, false, false] } : st;
+                                                            } else if (starredDisplayMode === 'show_l3') {
+                                                                renderSt = st.answerSelected ? { ...st, showExpl: true, openStates: [false, false, true] } : st;
+                                                            } else if (starredDisplayMode === 'show_all') {
+                                                                renderSt = st.answerSelected ? { ...st, showExpl: true, openStates: [true, true, true] } : st;
+                                                            }
+                                                        }
+
                                                         return (
                                                             <div key={q.uid}>
-                                                                {/* 狀態標籤 + 距離上次作答 + 精熟確認 */}
-                                                                {ql && st.answeredAt && (
+                                                                {/* 狀態標籤 + 距離上次作答 */}
+                                                                {ql && st.answeredAt && reviewFilter !== 'starred' && (
                                                                     <div className="flex items-center gap-2 mb-2">
                                                                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ql.cls}`}>{ql.label}</span>
                                                                         <span className="text-[10px] text-slate-400">上次作答：{Math.floor((Date.now() - st.answeredAt) / 86400000)} 天前</span>
-
                                                                     </div>
                                                                 )}
-                                                                {renderQuestion(q, safePage * REVIEW_PAGE_SIZE + idx, qStates[q.uid] || { answerSelected: null, status: 'unanswered', openStates: [false, false, false], showExpl: false, confidence: null, pendingConfidence: false }, reviewFilter === 'starred' ? 'review-starred' : 'review')}
+                                                                {renderQuestion(q, safePage * REVIEW_PAGE_SIZE + idx, renderSt, renderMode)}
                                                             </div>
                                                         );
                                                     })}
