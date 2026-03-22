@@ -1488,7 +1488,7 @@
             }, [activeTab, reviewFilter, qStatesSynced]);
 
             // 切換 filter 時重置載入守衛
-            React.useEffect(() => { reviewLoadedRef.current = false; }, [reviewFilter]);
+            React.useEffect(() => { reviewLoadedRef.current = false; }, [reviewFilter, starredUids]);
 
             // ── 1. 改用我們剛寫好的 RPC 函數撈取進階資料 ──
             const loadAdminEmails = async () => {
@@ -1696,7 +1696,7 @@
 
                                 {mode === 'review-starred' && (
                                     <div className="flex justify-end mb-4">
-                                        <button onClick={() => toggleStar(q.uid)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm bg-red-50 border-2 border-red-300 text-red-600 hover:bg-red-100">
+                                        <button onClick={() => { toggleStar(q.uid); setReviewQuestions(prev => prev.filter(rq => rq.uid !== q.uid)); }} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm bg-red-50 border-2 border-red-300 text-red-600 hover:bg-red-100">
                                             <Icons.Star filled className="w-4 h-4" /> 移出資料夾
                                         </button>
                                     </div>
