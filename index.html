@@ -1323,7 +1323,7 @@
                 setQStates(p => {
                     const prev = p[uid];
                     const isCorrect = prev._correctAns?.includes(prev.answerSelected);
-                    return { ...p, [uid]: { ...prev, pendingConfidence: false, confidence: confident ? 'sure' : 'guess', status: isCorrect ? 'correct' : 'incorrect', answeredAt: Date.now() } };
+                    return { ...p, [uid]: { ...prev, pendingConfidence: false, confidence: confident ? 'sure' : 'guess', status: isCorrect ? 'correct' : 'incorrect', answeredAt: Date.now(), dept: selectedContext.subject || prev.dept } };
                 });
             };
             const handleShowAI = (uid) => setQStates(p => ({ ...p, [uid]: { ...p[uid], status: p[uid].status === 'unanswered' ? 'viewed' : p[uid].status, showExpl: true } }));
@@ -1821,17 +1821,24 @@
                                 for (let i = 0; i < 30; i++) { const d = new Date(now - i * 86400000); if (daySet.has(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`)) streak++; else if (i > 0) break; }
                                 // 科別統計
                                 const deptStats = (() => {
+                                    // Fallback: UID → 最具體科別（非內科優先）
                                     const uidToDept = new Map();
+                                    const bigDepts = new Set();
+                                    knowledgeGraphData.forEach(dept => { if (dept.get?.('isSubdivided') || dept.isSubdivided) bigDepts.add(dept.name); });
                                     knowledgeGraphData.forEach(dept => {
                                         const dn = dept.name;
-                                        const mu = (cats) => { cats.forEach(cat => { cat.keywords?.forEach(kw => { kw.uids?.forEach(uid => { if (!uidToDept.has(uid)) uidToDept.set(uid, dn); }); }); }); };
+                                        const mu = (cats) => { cats.forEach(cat => { cat.keywords?.forEach(kw => { kw.uids?.forEach(uid => {
+                                            // 優先保留更具體的科別（非大科）
+                                            if (!uidToDept.has(uid) || bigDepts.has(uidToDept.get(uid))) uidToDept.set(uid, dn);
+                                        }); }); }); };
                                         if (dept.isSubdivided) { dept.children?.forEach(sub => mu(sub.categories || [])); } else { mu(dept.categories || []); }
                                     });
                                     const map = {};
                                     Object.entries(qStates).forEach(([uid, s]) => {
                                         if (!s || !s.confidence || s.status === 'unanswered') return;
                                         const qk = getQuadrant(s.status, s.confidence); if (!qk) return;
-                                        const dn = uidToDept.get(uid); if (!dn) return;
+                                        // 優先使用使用者實際點選的科別，其次用 uidToDept fallback
+                                        const dn = s.dept || uidToDept.get(uid); if (!dn) return;
                                         if (!map[dn]) map[dn] = { name: dn, mastered: 0, lucky: 0, myth: 0, blank: 0, total: 0 };
                                         map[dn][qk]++; map[dn].total++;
                                     });
