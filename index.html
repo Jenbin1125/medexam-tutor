@@ -1349,7 +1349,7 @@
             const reviewLoadedRef = React.useRef(false);
             React.useEffect(() => {
                 if (activeTab !== 'review') { reviewLoadedRef.current = false; return; }
-                // 防止同一個 filter 內重複載入（多輪作答不會觸發重新載入）
+                if (!qStatesSynced) return; // 等雲端合併完成後才載入
                 const filterKey = `${activeTab}_${reviewFilter}`;
                 if (reviewLoadedRef.current === filterKey) return;
                 reviewLoadedRef.current = filterKey;
@@ -1376,7 +1376,6 @@
                     });
                 }
 
-                // 快照 UIDs 並載入題目
                 reviewSnapshotRef.current = uids;
                 if (uids.length === 0) { setReviewQuestions([]); return; }
                 setLoadingReview(true);
@@ -1390,7 +1389,7 @@
                         setReviewQuestions(data || []);
                     } catch (e) { console.error(e); } finally { setLoadingReview(false); }
                 })();
-            }, [activeTab, reviewFilter]);
+            }, [activeTab, reviewFilter, qStatesSynced]);
 
             // 切換 filter 時重置載入守衛
             React.useEffect(() => { reviewLoadedRef.current = false; }, [reviewFilter]);
@@ -1801,6 +1800,65 @@
 
                     <main className="flex-1 max-w-4xl w-full mx-auto p-4 md:p-6 pb-20">
                         <div className={activeTab === 'graph' ? 'block animate-fade-in' : 'hidden'}>
+                            {/* ── 智慧選題懶人包 ── */}
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-4">
+                                <details>
+                                    <summary className="cursor-pointer text-sm font-bold text-slate-600 hover:text-teal-600 transition-colors flex items-center gap-2">
+                                        🎯 智慧選題指南 — 7,039 題怎麼選？
+                                    </summary>
+                                    <div className="mt-4 space-y-3">
+                                        {(() => {
+                                            // 計算各層級的完成度
+                                            const importantKws = []; const hotKws = []; const coldKws = [];
+                                            knowledgeGraphData.forEach(dept => {
+                                                const scanCats = (cats) => cats.forEach(cat => {
+                                                    const target = cat.name.includes('重要') ? importantKws : cat.name.includes('熱門') ? hotKws : coldKws;
+                                                    cat.keywords?.forEach(kw => target.push({ ...kw, deptName: dept.name }));
+                                                });
+                                                if (dept.isSubdivided) dept.children?.forEach(sub => scanCats(sub.categories || []));
+                                                else scanCats(dept.categories || []);
+                                            });
+                                            const kwDone = (kw) => kw.uids?.some(uid => qStates[uid]?.confidence);
+                                            const impDone = importantKws.filter(kwDone).length;
+                                            const hotDone = hotKws.filter(kwDone).length;
+                                            const impPct = importantKws.length > 0 ? Math.round((impDone / importantKws.length) * 100) : 0;
+                                            const hotPct = hotKws.length > 0 ? Math.round((hotDone / hotKws.length) * 100) : 0;
+
+                                            return (<>
+                                                <p className="text-xs text-slate-500 leading-relaxed">題庫共 7,039 題，不需要全部做完。按以下優先順序選題，用最少的時間覆蓋最多的考點：</p>
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                                    <div className="rounded-xl p-3 border border-red-100 bg-red-50/50">
+                                                        <div className="flex items-center justify-between mb-1.5">
+                                                            <span className="text-xs font-bold text-red-700">🔥 第一層：必做</span>
+                                                            <span className="text-[10px] font-bold text-red-500">{impDone}/{importantKws.length}</span>
+                                                        </div>
+                                                        <div className="h-1.5 bg-red-100 rounded-full overflow-hidden mb-1.5"><div className="h-full bg-red-500 rounded-full" style={{width:`${impPct}%`}}/></div>
+                                                        <p className="text-[10px] text-slate-500 leading-relaxed">每個「重要考點」至少做 1 題。這些是歷年高頻考點，約 {importantKws.length} 個知識點。</p>
+                                                    </div>
+                                                    <div className="rounded-xl p-3 border border-amber-100 bg-amber-50/50">
+                                                        <div className="flex items-center justify-between mb-1.5">
+                                                            <span className="text-xs font-bold text-amber-700">⭐ 第二層：建議</span>
+                                                            <span className="text-[10px] font-bold text-amber-500">{hotDone}/{hotKws.length}</span>
+                                                        </div>
+                                                        <div className="h-1.5 bg-amber-100 rounded-full overflow-hidden mb-1.5"><div className="h-full bg-amber-500 rounded-full" style={{width:`${hotPct}%`}}/></div>
+                                                        <p className="text-[10px] text-slate-500 leading-relaxed">每個「熱門考點」至少做 1 題。覆蓋中頻考點，約 {hotKws.length} 個知識點。</p>
+                                                    </div>
+                                                    <div className="rounded-xl p-3 border border-slate-200 bg-slate-50/50">
+                                                        <div className="flex items-center justify-between mb-1.5">
+                                                            <span className="text-xs font-bold text-slate-500">📚 第三層：選做</span>
+                                                            <span className="text-[10px] font-bold text-slate-400">{coldKws.length} 知識點</span>
+                                                        </div>
+                                                        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden mb-1.5"><div className="h-full bg-slate-400 rounded-full" style={{width:'0%'}}/></div>
+                                                        <p className="text-[10px] text-slate-500 leading-relaxed">冷門/罕見考點。時間充裕才需要碰，優先級最低。</p>
+                                                    </div>
+                                                </div>
+                                                <p className="text-[10px] text-slate-400 leading-relaxed">💡 建議策略：先完成第一層（🔥重要），再推進第二層（⭐熱門）。在知識圖譜中，展開各科目即可看到分類。優先點選尚未打勾的知識點進入做題。</p>
+                                            </>);
+                                        })()}
+                                    </div>
+                                </details>
+                            </div>
+
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <div className="relative mb-8">
                                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Icons.Search /></div>
